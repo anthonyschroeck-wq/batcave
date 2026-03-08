@@ -850,7 +850,10 @@ function HomepageModule({ isMobile }) {
 // ─── Integrations Module ─────────────────────────────────────────
 function IntegrationsModule({ isMobile, liveData }) {
   const { status, loading, refresh } = liveData || {};
-  const integrationList = Object.values(INTEGRATIONS);
+  const [configuring, setConfiguring] = useState(null);
+  const [keyInput, setKeyInput] = useState("");
+  const [configState, setConfigState] = useState(null); // null | "testing" | "done" | "error"
+  const [configError, setConfigError] = useState(null);
 
   const icons = {
     github: I.external,
@@ -860,97 +863,244 @@ function IntegrationsModule({ isMobile, liveData }) {
     gcal: I.layers,
   };
 
+  const setupGuides = {
+    finnhub: {
+      steps: [
+        { text: "Create a free Finnhub account", link: "https://finnhub.io/register", linkLabel: "Sign up" },
+        { text: "Copy your API key from the dashboard", link: "https://finnhub.io/dashboard", linkLabel: "Open dashboard" },
+        { text: "Paste it below" },
+      ],
+      configurable: true,
+    },
+    github: {
+      steps: [
+        { text: "Create a fine-grained PAT", link: "https://github.com/settings/personal-access-tokens/new", linkLabel: "Create token" },
+        { text: "Scope: select repos, Contents read/write, Metadata read" },
+        { text: "Paste it below" },
+      ],
+      configurable: true,
+    },
+    vercel: {
+      steps: [
+        { text: "Create a Vercel API token", link: "https://vercel.com/account/tokens", linkLabel: "Open tokens" },
+        { text: "Full Account scope, 90 day expiration" },
+      ],
+      configurable: false,
+      note: "The Vercel token bootstraps all other integrations and must be set manually.",
+      manualLink: "https://vercel.com/anthonyschroeck-wqs-projects/batcave/settings/environment-variables",
+    },
+    gmail: {
+      steps: [{ text: "OAuth integration — coming soon" }],
+      configurable: false,
+    },
+    gcal: {
+      steps: [{ text: "OAuth integration — coming soon" }],
+      configurable: false,
+    },
+  };
+
+  const handleConfigure = async (serviceId) => {
+    if (!keyInput.trim()) return;
+    setConfigState("testing");
+    setConfigError(null);
+    try {
+      const res = await fetch("/api/configure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ service: serviceId, key: keyInput.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setConfigState("error");
+        setConfigError(data.error || "Configuration failed");
+        return;
+      }
+      setConfigState("done");
+      setKeyInput("");
+      setTimeout(() => { refresh?.(); }, 3000);
+    } catch {
+      setConfigState("error");
+      setConfigError("Network error");
+    }
+  };
+
+  const closeConfig = () => {
+    setConfiguring(null);
+    setKeyInput("");
+    setConfigState(null);
+    setConfigError(null);
+  };
+
+  const integrationList = Object.values(INTEGRATIONS);
+
   return (
     <div style={{ animation: "fadeUp 0.4s ease both" }}>
       <p style={{
         fontFamily: F.body, fontSize: "15px", fontWeight: 300,
         color: C.fog, marginBottom: "32px", maxWidth: "520px", lineHeight: 1.65,
       }}>
-        Manage connections to external services. Connected integrations push live data to the dashboard.
+        Connect services to power live data across the Batcave. Tap Connect and follow the guided setup.
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
         {integrationList.map((intg, i) => {
           const st = status?.[intg.id];
           const connected = st?.connected || false;
+          const isOpen = configuring === intg.id;
+          const guide = setupGuides[intg.id];
+
           return (
             <div key={intg.id} style={{
-              backgroundColor: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
-              padding: isMobile ? "16px" : "18px 20px",
-              display: "flex", alignItems: "center", gap: "14px",
+              backgroundColor: C.cavern, border: `1px solid ${isOpen ? C.amber : C.stone}`,
+              borderRadius: "6px", overflow: "hidden",
               animation: `fadeUp 0.35s ease ${0.06 * i}s both`,
               transition: "border-color 0.3s ease",
-            }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = C.slate}
-              onMouseLeave={e => e.currentTarget.style.borderColor = C.stone}
-            >
+            }}>
+              {/* Header */}
               <div style={{
-                width: "20px", height: "20px", color: connected ? C.amber : C.iron, flexShrink: 0,
-              }}>{icons[intg.id] || I.layers}</div>
-
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span style={{ fontFamily: F.sans, fontSize: "14px", fontWeight: 600, color: C.parchment }}>{intg.label}</span>
-                  <span style={{
-                    display: "inline-flex", alignItems: "center", gap: "4px",
-                    fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.06em",
-                    padding: "2px 8px", borderRadius: "3px",
-                    backgroundColor: connected ? "rgba(90,138,106,0.12)" : "rgba(154,74,74,0.12)",
-                    color: connected ? C.success : C.danger,
-                    border: `1px solid ${connected ? "rgba(90,138,106,0.2)" : "rgba(154,74,74,0.2)"}`,
-                  }}>
-                    <span style={{
-                      width: "5px", height: "5px", borderRadius: "50%",
-                      backgroundColor: connected ? C.success : C.danger,
-                    }} />
-                    {connected ? "connected" : "not connected"}
-                  </span>
-                </div>
-                <div style={{ fontFamily: F.sans, fontSize: "12px", color: C.iron, marginTop: "3px" }}>{intg.desc}</div>
-              </div>
-
-              {/* Env var hint */}
-              <div style={{
-                fontFamily: F.mono, fontSize: "9px", color: C.slate,
-                textAlign: "right", flexShrink: 0,
+                padding: isMobile ? "16px" : "18px 20px",
+                display: "flex", alignItems: "center", gap: "14px",
               }}>
-                {intg.envKey}
+                <div style={{ width: "20px", height: "20px", color: connected ? C.amber : C.iron, flexShrink: 0 }}>
+                  {icons[intg.id] || I.layers}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <span style={{ fontFamily: F.sans, fontSize: "14px", fontWeight: 600, color: C.parchment }}>{intg.label}</span>
+                    <span style={{
+                      display: "inline-flex", alignItems: "center", gap: "4px",
+                      fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.06em",
+                      padding: "2px 8px", borderRadius: "3px",
+                      backgroundColor: connected ? "rgba(90,138,106,0.12)" : "rgba(154,74,74,0.12)",
+                      color: connected ? C.success : C.danger,
+                      border: `1px solid ${connected ? "rgba(90,138,106,0.2)" : "rgba(154,74,74,0.2)"}`,
+                    }}>
+                      <span style={{ width: "5px", height: "5px", borderRadius: "50%", backgroundColor: connected ? C.success : C.danger }} />
+                      {connected ? "connected" : "not connected"}
+                    </span>
+                  </div>
+                  <div style={{ fontFamily: F.sans, fontSize: "12px", color: C.iron, marginTop: "3px" }}>{intg.desc}</div>
+                </div>
+                {!isOpen ? (
+                  <button onClick={() => { closeConfig(); setConfiguring(intg.id); }} style={{
+                    background: "none", border: `1px solid ${connected ? C.slate : C.amber}`,
+                    borderRadius: "4px", padding: isMobile ? "8px 14px" : "5px 12px",
+                    fontFamily: F.mono, fontSize: "11px", color: connected ? C.iron : C.amber,
+                    cursor: "pointer", minHeight: isMobile ? "40px" : undefined, whiteSpace: "nowrap",
+                  }}>{connected ? "reconnect" : "connect"}</button>
+                ) : (
+                  <button onClick={closeConfig} style={{
+                    background: "none", border: `1px solid ${C.slate}`, borderRadius: "4px",
+                    padding: isMobile ? "8px 14px" : "5px 12px",
+                    fontFamily: F.mono, fontSize: "11px", color: C.iron,
+                    cursor: "pointer", minHeight: isMobile ? "40px" : undefined,
+                  }}>close</button>
+                )}
               </div>
+
+              {/* Setup flow */}
+              {isOpen && guide && (
+                <div style={{
+                  borderTop: `1px solid ${C.stone}`,
+                  padding: isMobile ? "16px" : "18px 20px",
+                  animation: "fadeUp 0.2s ease both",
+                }}>
+                  {/* Numbered steps */}
+                  <div style={{ marginBottom: "16px" }}>
+                    {guide.steps.map((step, j) => (
+                      <div key={j} style={{ display: "flex", gap: "10px", alignItems: "flex-start", padding: "6px 0" }}>
+                        <span style={{ fontFamily: F.mono, fontSize: "10px", color: C.amber, minWidth: "16px", flexShrink: 0, marginTop: "2px" }}>{j + 1}.</span>
+                        <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.fog, lineHeight: 1.5 }}>
+                          {step.text}
+                          {step.link && (
+                            <a href={step.link} target="_blank" rel="noopener noreferrer" style={{
+                              display: "inline-block", marginLeft: "8px",
+                              fontFamily: F.mono, fontSize: "11px", color: C.amber, textDecoration: "none",
+                              padding: "2px 8px", borderRadius: "3px",
+                              backgroundColor: C.amberSubtle, border: `1px solid ${C.amberGlow}`,
+                            }}>{step.linkLabel}</a>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Manual-only services */}
+                  {!guide.configurable && guide.note && (
+                    <div style={{
+                      padding: "12px 14px", borderRadius: "4px", backgroundColor: C.obsidian,
+                      fontFamily: F.sans, fontSize: "12px", color: C.iron, lineHeight: 1.6,
+                    }}>
+                      {guide.note}
+                      {guide.manualLink && (
+                        <div style={{ marginTop: "8px" }}>
+                          <a href={guide.manualLink} target="_blank" rel="noopener noreferrer" style={{
+                            fontFamily: F.mono, fontSize: "11px", color: C.amber, textDecoration: "none",
+                          }}>Open Vercel env vars</a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Key input for configurable services */}
+                  {guide.configurable && (
+                    <div>
+                      <div style={{ display: "flex", gap: "8px", alignItems: "stretch" }}>
+                        <input type="password" value={keyInput}
+                          onChange={e => { setKeyInput(e.target.value); setConfigState(null); setConfigError(null); }}
+                          placeholder={`Paste ${intg.label} API key...`}
+                          style={{
+                            flex: 1, background: C.obsidian, border: `1px solid ${C.slate}`,
+                            borderRadius: "4px", padding: isMobile ? "12px" : "8px 12px",
+                            fontFamily: F.mono, fontSize: isMobile ? "14px" : "12px",
+                            color: C.parchment, outline: "none",
+                            minHeight: isMobile ? "48px" : undefined,
+                          }}
+                          onFocus={e => e.currentTarget.style.borderColor = C.amber}
+                          onBlur={e => e.currentTarget.style.borderColor = C.slate}
+                        />
+                        <button onClick={() => handleConfigure(intg.id)}
+                          disabled={!keyInput.trim() || configState === "testing"}
+                          style={{
+                            background: C.amber, border: "none", borderRadius: "4px",
+                            padding: isMobile ? "12px 20px" : "8px 16px",
+                            fontFamily: F.mono, fontSize: "12px", fontWeight: 600,
+                            color: C.obsidian, cursor: "pointer",
+                            minHeight: isMobile ? "48px" : undefined,
+                            opacity: !keyInput.trim() || configState === "testing" ? 0.5 : 1,
+                            whiteSpace: "nowrap",
+                          }}>{configState === "testing" ? "validating..." : "connect"}</button>
+                      </div>
+
+                      {configState === "done" && (
+                        <div style={{
+                          marginTop: "12px", padding: "10px 14px", borderRadius: "4px",
+                          backgroundColor: "rgba(90,138,106,0.1)", border: "1px solid rgba(90,138,106,0.2)",
+                          fontFamily: F.sans, fontSize: "13px", color: C.success, lineHeight: 1.5,
+                        }}>Connected. Key validated, saved, and redeploy triggered. Live data will appear in ~30 seconds.</div>
+                      )}
+                      {configState === "error" && (
+                        <div style={{
+                          marginTop: "12px", padding: "10px 14px", borderRadius: "4px",
+                          backgroundColor: "rgba(154,74,74,0.1)", border: "1px solid rgba(154,74,74,0.2)",
+                          fontFamily: F.sans, fontSize: "13px", color: C.danger, lineHeight: 1.5,
+                        }}>{configError || "Something went wrong."}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
       </div>
 
-      {/* Setup instructions */}
-      <div style={{
-        marginTop: "32px", padding: isMobile ? "16px" : "20px",
-        backgroundColor: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
-      }}>
-        <div style={{
-          fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.08em",
-          textTransform: "uppercase", color: C.amber, marginBottom: "12px",
-        }}>Setup</div>
-        <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.fog, lineHeight: 1.8 }}>
-          <div>Add environment variables in Vercel to connect integrations.</div>
-          <div style={{ marginTop: "8px" }}>
-            <a href="https://vercel.com/anthonyschroeck-wqs-projects/batcave/settings/environment-variables"
-              target="_blank" rel="noopener noreferrer"
-              style={{ color: C.amber, textDecoration: "none" }}>
-              Open Vercel Environment Variables
-            </a>
-          </div>
-        </div>
-      </div>
-
-      {/* Refresh */}
-      <div style={{ marginTop: "16px", display: "flex", gap: "10px", alignItems: "center" }}>
+      <div style={{ marginTop: "20px" }}>
         <button onClick={refresh} style={{
           background: "none", border: `1px solid ${C.slate}`, borderRadius: "4px",
           padding: isMobile ? "10px 16px" : "6px 14px", fontFamily: F.mono, fontSize: "11px",
           color: C.amber, cursor: "pointer", minHeight: isMobile ? "44px" : undefined,
-        }}>
-          {loading ? "checking..." : "refresh status"}
-        </button>
+        }}>{loading ? "checking..." : "refresh status"}</button>
       </div>
     </div>
   );
@@ -1126,7 +1276,7 @@ export default function BatcaveConsole() {
         <div style={{
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em",
-        }}>v2.6 // batcave</div>
+        }}>v2.7 // batcave</div>
       )}
     </>
   );
