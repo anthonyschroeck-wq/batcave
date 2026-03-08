@@ -467,9 +467,6 @@ function LoginScreen({ onLogin, isMobile }) {
               {mode === "login" ? "Need an account? Sign up" : "Already have an account? Sign in"}
             </button>
           </div>
-
-
-          </div>
         </div>
       </div>
     </div>
