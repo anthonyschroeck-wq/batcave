@@ -35,8 +35,11 @@ function useAuth() {
   };
 
   const signUp = async (email, password) => {
-    const { error } = await supabase.auth.signUp({ email, password });
-    return error;
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) return { error };
+    // If email confirmation is required, session will be null
+    const needsConfirmation = !data.session;
+    return { error: null, needsConfirmation };
   };
 
   const signOut = async () => {
@@ -339,17 +342,29 @@ function LoginScreen({ onLogin, isMobile }) {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState("login"); // login | signup
+  const [success, setSuccess] = useState(null);
 
   const handleSubmit = async () => {
     if (!email || !password) return;
     setLoading(true);
     setError(null);
-    const err = mode === "login"
-      ? await onLogin.signIn(email, password)
-      : await onLogin.signUp(email, password);
-    setLoading(false);
-    if (err) setError(err.message);
-    else if (mode === "signup") setError(null);
+    setSuccess(null);
+
+    if (mode === "login") {
+      const err = await onLogin.signIn(email, password);
+      setLoading(false);
+      if (err) setError(err.message);
+    } else {
+      const result = await onLogin.signUp(email, password);
+      setLoading(false);
+      if (result.error) {
+        setError(result.error.message);
+      } else if (result.needsConfirmation) {
+        setSuccess("Account created. Check your email to confirm, then sign in.");
+        setMode("login");
+      }
+      // If no confirmation needed, onAuthStateChange will pick up the session
+    }
   };
 
   const inputStyle = {
@@ -411,6 +426,14 @@ function LoginScreen({ onLogin, isMobile }) {
               backgroundColor: "rgba(154,74,74,0.1)", border: "1px solid rgba(154,74,74,0.2)",
               fontFamily: F.sans, fontSize: "12px", color: C.danger,
             }}>{error}</div>
+          )}
+
+          {success && (
+            <div style={{
+              padding: "8px 12px", borderRadius: "4px", marginBottom: "12px",
+              backgroundColor: "rgba(90,138,106,0.1)", border: "1px solid rgba(90,138,106,0.2)",
+              fontFamily: F.sans, fontSize: "12px", color: C.success,
+            }}>{success}</div>
           )}
 
           <button onClick={handleSubmit} disabled={loading || !email || !password} style={{
