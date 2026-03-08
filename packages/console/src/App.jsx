@@ -468,19 +468,7 @@ function LoginScreen({ onLogin, isMobile }) {
             </button>
           </div>
 
-          {/* Debug info */}
-          <div style={{
-            marginTop: "20px", padding: "10px", borderRadius: "4px",
-            backgroundColor: C.obsidian, fontFamily: F.mono, fontSize: "9px",
-            color: C.slate, lineHeight: 1.8,
-          }}>
-            <div>supabase: {supabase ? "initialized" : "null"}</div>
-            <div>url: {_supaUrl ? _supaUrl.slice(0, 30) + "..." : "not set"}</div>
-            <div>key: {_supaKey ? _supaKey.slice(0, 8) + "..." : "not set"}</div>
-            <div>email: {email ? "has value" : "empty"}</div>
-            <div>password: {password ? "has value" : "empty"}</div>
-            <div>loading: {String(loading)}</div>
-            <div>mode: {mode}</div>
+
           </div>
         </div>
       </div>
