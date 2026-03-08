@@ -426,14 +426,14 @@ function LoginScreen({ onLogin, isMobile }) {
         position: "absolute", top: "-20%", right: "-10%",
         width: "60vw", height: "60vw", maxWidth: "600px", maxHeight: "600px",
         borderRadius: "50%", pointerEvents: "none",
-        background: "radial-gradient(circle, rgba(123,143,163,0.1) 0%, rgba(123,143,163,0.03) 40%, transparent 65%)",
+        background: "radial-gradient(circle, rgba(123,143,163,0.2) 0%, rgba(123,143,163,0.06) 40%, transparent 65%)",
         animation: "loginOrb 20s ease-in-out infinite",
       }} />
       <div style={{
         position: "absolute", bottom: "-25%", left: "-15%",
         width: "50vw", height: "50vw", maxWidth: "500px", maxHeight: "500px",
         borderRadius: "50%", pointerEvents: "none",
-        background: "radial-gradient(circle, rgba(90,138,106,0.07) 0%, transparent 60%)",
+        background: "radial-gradient(circle, rgba(90,138,106,0.16) 0%, rgba(90,138,106,0.04) 40%, transparent 65%)",
         animation: "loginOrb 25s ease-in-out infinite",
         animationDelay: "-8s",
       }} />
@@ -441,7 +441,7 @@ function LoginScreen({ onLogin, isMobile }) {
       {/* Horizontal accent line */}
       <div style={{
         position: "absolute", top: "35%", left: 0, right: 0, height: "1px",
-        background: "linear-gradient(90deg, transparent, rgba(123,143,163,0.08), transparent)",
+        background: "linear-gradient(90deg, transparent, rgba(123,143,163,0.18), transparent)",
         animation: "loginPulse 6s ease infinite",
       }} />
 
@@ -453,7 +453,7 @@ function LoginScreen({ onLogin, isMobile }) {
         <div style={{ textAlign: "center", marginBottom: "48px" }}>
           <div style={{
             width: "56px", height: "56px", color: C.amber, margin: "0 auto 20px",
-            filter: "drop-shadow(0 0 20px rgba(123,143,163,0.25))",
+            filter: "drop-shadow(0 0 30px rgba(123,143,163,0.5)) drop-shadow(0 0 60px rgba(123,143,163,0.2))",
             animation: "fadeUp 0.6s ease 0.1s both",
           }}>{I.bat}</div>
           <div style={{
@@ -470,8 +470,8 @@ function LoginScreen({ onLogin, isMobile }) {
 
         {/* Form */}
         <div style={{
-          background: "rgba(26, 26, 32, 0.5)",
-          backdropFilter: "blur(16px) saturate(120%)",
+          background: "rgba(20, 20, 30, 0.4)",
+          backdropFilter: "blur(24px) saturate(140%)",
           WebkitBackdropFilter: "blur(16px) saturate(120%)",
           border: "1px solid rgba(60, 60, 80, 0.3)",
           borderRadius: "12px",
@@ -482,7 +482,7 @@ function LoginScreen({ onLogin, isMobile }) {
           {/* Top glow */}
           <div style={{
             position: "absolute", top: 0, left: "15%", right: "15%", height: "1px",
-            background: "linear-gradient(90deg, transparent, rgba(123,143,163,0.3), transparent)",
+            background: "linear-gradient(90deg, transparent, rgba(123,143,163,0.5), transparent)",
           }} />
           <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "16px" }}>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)}
@@ -525,7 +525,7 @@ function LoginScreen({ onLogin, isMobile }) {
             color: loading || !email || !password ? C.iron : C.obsidian,
             cursor: loading || !email || !password ? "not-allowed" : "pointer",
             transition: "all 0.3s ease",
-            boxShadow: loading || !email || !password ? "none" : "0 4px 20px rgba(123,143,163,0.15)",
+            boxShadow: loading || !email || !password ? "none" : "0 4px 30px rgba(123,143,163,0.25), 0 0 60px rgba(123,143,163,0.1)",
           }}>
             {loading ? "..." : mode === "login" ? "Sign In" : "Create Account"}
           </button>
@@ -591,7 +591,7 @@ function CommandBar({ onClose, isMobile, session, onAction }) {
   return (
     <div onClick={onClose} style={{
       position: "fixed", inset: 0,
-      backgroundColor: "rgba(10,10,14,0.75)",
+      backgroundColor: "rgba(6,6,10,0.82)",
       backdropFilter: "blur(16px) saturate(120%)",
       display: "flex", alignItems: "flex-start",
       justifyContent: "center", paddingTop: isMobile ? "10vh" : "16vh",
@@ -603,13 +603,13 @@ function CommandBar({ onClose, isMobile, session, onAction }) {
         backgroundColor: C.cavern,
         border: `1px solid ${C.slate}`,
         borderRadius: "12px", overflow: "hidden",
-        boxShadow: `0 32px 100px rgba(0,0,0,0.6), 0 0 0 1px ${C.stone}, 0 0 60px rgba(123,143,163,0.05)`,
+        boxShadow: `0 32px 100px rgba(0,0,0,0.7), 0 0 0 1px rgba(60,60,80,0.3), 0 0 80px rgba(123,143,163,0.1), inset 0 1px 0 rgba(255,255,255,0.03)`,
         animation: "slideUp 0.25s cubic-bezier(0.22,1,0.36,1)",
       }}>
         {/* Top glow bar */}
         <div style={{
           position: "absolute", top: 0, left: "10%", right: "10%", height: "1px",
-          background: `linear-gradient(90deg, transparent, ${C.amber}60, transparent)`,
+          background: `linear-gradient(90deg, transparent, ${C.amber}, transparent)`,
           backgroundSize: "200% 100%",
           animation: "borderFlow 4s ease infinite",
         }} />
@@ -623,7 +623,7 @@ function CommandBar({ onClose, isMobile, session, onAction }) {
           <div style={{
             width: "18px", height: "18px", flexShrink: 0,
             color: loading ? C.caution : C.amber,
-            filter: loading ? "none" : "drop-shadow(0 0 6px rgba(123,143,163,0.3))",
+            filter: loading ? "none" : "drop-shadow(0 0 10px rgba(123,143,163,0.5))",
             transition: "filter 0.3s ease",
           }}>{I.command}</div>
           <input ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
@@ -719,7 +719,7 @@ function NavItem({ icon, label, active, collapsed, onClick, isMobile }) {
         width: "100%",
         padding: collapsed ? "9px 0" : isMobile ? "14px 20px" : "9px 14px",
         justifyContent: collapsed ? "center" : "flex-start",
-        background: active ? `linear-gradient(90deg, ${C.amberSubtle}, transparent)` : "transparent",
+        background: active ? `linear-gradient(90deg, rgba(123,143,163,0.12), transparent)` : "transparent",
         border: "none",
         borderLeft: `2px solid ${active ? C.amber : "transparent"}`,
         cursor: "pointer", borderRadius: 0,
@@ -730,14 +730,14 @@ function NavItem({ icon, label, active, collapsed, onClick, isMobile }) {
       {active && <div style={{
         position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)",
         width: "2px", height: "60%",
-        boxShadow: `0 0 8px 2px rgba(123,143,163,0.3)`,
+        boxShadow: `0 0 12px 3px rgba(123,143,163,0.5)`,
         pointerEvents: "none",
       }} />}
       <div style={{
         width: isMobile ? "22px" : "18px", height: isMobile ? "22px" : "18px", flexShrink: 0,
         color: lit ? C.amber : C.iron,
         transition: "color 0.25s ease, filter 0.25s ease",
-        filter: active ? "drop-shadow(0 0 4px rgba(123,143,163,0.3))" : "none",
+        filter: active ? "drop-shadow(0 0 6px rgba(123,143,163,0.5))" : "none",
       }}>{icon}</div>
       {!collapsed && (
         <span style={{
@@ -1037,7 +1037,10 @@ function QuickCommand({ isMobile, session, triggerRefresh }) {
       }}>
         <div style={{
           flex: 1, display: "flex", alignItems: "center", gap: "8px",
-          background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
+          background: "rgba(22,22,32,0.4)", backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          border: "1px solid rgba(70,70,90,0.25)", borderRadius: "8px",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
           padding: isMobile ? "10px 14px" : "8px 14px",
           transition: "border-color 0.2s ease",
         }}>
@@ -1158,7 +1161,7 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
           <div style={{
             position: "relative", overflow: "hidden",
             borderRadius: "8px",
-            background: `linear-gradient(135deg, ${C.cavern} 0%, ${C.abyss} 60%, ${C.void} 100%)`,
+            background: `linear-gradient(135deg, rgba(26,26,36,0.8) 0%, rgba(14,14,22,0.9) 60%, rgba(10,10,16,0.95) 100%)`,
             border: `1px solid ${C.stone}`,
             animation: "fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) both",
           }}>
@@ -1166,7 +1169,7 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
             <div style={{
               position: "absolute", top: "-40px", right: "-40px",
               width: "200px", height: "200px", borderRadius: "50%",
-              background: `radial-gradient(circle, ${C.amberGlow} 0%, transparent 70%)`,
+              background: "radial-gradient(circle, rgba(123,143,163,0.25) 0%, rgba(123,143,163,0.06) 50%, transparent 75%)",
               animation: "ambientShift 15s ease-in-out infinite",
               pointerEvents: "none",
             }} />
@@ -1174,7 +1177,7 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
             {/* Left accent bar */}
             <div style={{
               position: "absolute", left: 0, top: 0, bottom: 0, width: "3px",
-              background: `linear-gradient(180deg, ${C.amber}, ${C.embers}40, transparent)`,
+              background: `linear-gradient(180deg, ${C.amber}, ${C.amberLight}80, ${C.embers}20, transparent)`,
               backgroundSize: "100% 200%",
               animation: "borderFlow 6s ease infinite",
             }} />
@@ -2773,7 +2776,7 @@ export default function BatcaveConsole() {
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.5 // batcave</span>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.6 // batcave</span>
           {auth.session && (
             <button onClick={auth.signOut} style={{
               background: "none", border: "none", cursor: "pointer",
@@ -2790,7 +2793,7 @@ export default function BatcaveConsole() {
       fontFamily: F.sans, display: "flex", flexDirection: "column",
       height: "100vh", color: C.parchment,
       overflow: "hidden", WebkitFontSmoothing: "antialiased",
-      background: `linear-gradient(145deg, #0c0c12 0%, ${C.obsidian} 30%, #10101a 60%, #0d0d15 100%)`,
+      background: `linear-gradient(145deg, #08081a 0%, #0d0d1a 20%, #111120 45%, #0f1018 70%, #0a0a16 100%)`,
     }}>
       {/* Fonts + viewport */}
       <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@300;400;500&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet" />
@@ -2841,14 +2844,29 @@ export default function BatcaveConsole() {
 
         /* Glass card base */
         .bc-glass {
-          background: rgba(26, 26, 32, 0.6);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1px solid rgba(60, 60, 80, 0.3);
+          background: rgba(22, 22, 32, 0.5);
+          backdrop-filter: blur(16px) saturate(130%);
+          -webkit-backdrop-filter: blur(16px) saturate(130%);
+          border: 1px solid rgba(70, 70, 90, 0.25);
           border-radius: 10px;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 4px 24px rgba(0,0,0,0.2);
         }
         .bc-glass:hover {
-          border-color: rgba(123, 143, 163, 0.2);
+          border-color: rgba(123, 143, 163, 0.25);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 32px rgba(0,0,0,0.25), 0 0 20px rgba(123,143,163,0.04);
+        }
+
+        /* Visible noise texture overlay */
+        .bc-noise::before {
+          content: '';
+          position: fixed;
+          inset: 0;
+          z-index: 9998;
+          pointer-events: none;
+          opacity: 0.35;
+          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+          background-repeat: repeat;
+          background-size: 256px 256px;
         }
 
         /* Animated border */
@@ -2880,19 +2898,21 @@ export default function BatcaveConsole() {
         select:focus { border-color: ${C.amber} !important; }
       `}</style>
 
+      <div className="bc-noise" />
+
       {/* Atmospheric orbs — actually visible */}
       <div style={{
         position: "fixed", top: "-15%", right: "-10%",
         width: "50vw", height: "50vw", maxWidth: "700px", maxHeight: "700px",
         borderRadius: "50%", pointerEvents: "none", zIndex: 0,
-        background: "radial-gradient(circle, rgba(123,143,163,0.08) 0%, rgba(123,143,163,0.03) 40%, transparent 70%)",
+        background: "radial-gradient(circle, rgba(123,143,163,0.22) 0%, rgba(123,143,163,0.08) 40%, transparent 65%)",
         animation: "orbFloat 25s ease-in-out infinite",
       }} />
       <div style={{
         position: "fixed", bottom: "-20%", left: "-5%",
         width: "40vw", height: "40vw", maxWidth: "500px", maxHeight: "500px",
         borderRadius: "50%", pointerEvents: "none", zIndex: 0,
-        background: "radial-gradient(circle, rgba(90,138,106,0.06) 0%, rgba(90,138,106,0.02) 40%, transparent 70%)",
+        background: "radial-gradient(circle, rgba(90,138,106,0.15) 0%, rgba(90,138,106,0.05) 40%, transparent 65%)",
         animation: "orbFloat 30s ease-in-out infinite",
         animationDelay: "-10s",
       }} />
@@ -2900,7 +2920,7 @@ export default function BatcaveConsole() {
         position: "fixed", top: "40%", left: "30%",
         width: "30vw", height: "30vw", maxWidth: "400px", maxHeight: "400px",
         borderRadius: "50%", pointerEvents: "none", zIndex: 0,
-        background: "radial-gradient(circle, rgba(184,144,64,0.04) 0%, transparent 60%)",
+        background: "radial-gradient(circle, rgba(184,144,64,0.12) 0%, rgba(184,144,64,0.03) 40%, transparent 65%)",
         animation: "orbFloat 35s ease-in-out infinite",
         animationDelay: "-18s",
       }} />
@@ -2912,7 +2932,7 @@ export default function BatcaveConsole() {
           <div style={{
             position: "fixed", top: 0, left: 0, right: 0, zIndex: 50,
             height: "56px",
-            background: "rgba(26, 26, 32, 0.75)",
+            background: "rgba(18, 18, 26, 0.6)",
             backdropFilter: "blur(20px) saturate(130%)",
             WebkitBackdropFilter: "blur(20px) saturate(130%)",
             borderBottom: "1px solid rgba(60, 60, 80, 0.25)",
@@ -2958,7 +2978,7 @@ export default function BatcaveConsole() {
           drawerOpen && (
             <nav style={{
               position: "fixed", top: 0, left: 0, bottom: 0, width: "280px",
-              background: "rgba(22, 22, 28, 0.85)",
+              background: "rgba(16, 16, 24, 0.7)",
               backdropFilter: "blur(24px) saturate(130%)",
               WebkitBackdropFilter: "blur(24px) saturate(130%)",
               zIndex: 101,
@@ -2991,7 +3011,7 @@ export default function BatcaveConsole() {
           // Desktop sidebar
           <nav style={{
             width: collapsed ? 56 : 200,
-            background: "rgba(22, 22, 28, 0.7)",
+            background: "rgba(18, 18, 26, 0.55)",
             backdropFilter: "blur(16px) saturate(120%)",
             WebkitBackdropFilter: "blur(16px) saturate(120%)",
             borderRight: "1px solid rgba(60, 60, 80, 0.25)",
@@ -3005,7 +3025,7 @@ export default function BatcaveConsole() {
             <div style={{
               position: "absolute", top: "-30px", left: "-30px",
               width: "160px", height: "160px", borderRadius: "50%",
-              background: "radial-gradient(circle, rgba(123,143,163,0.12) 0%, transparent 70%)",
+              background: "radial-gradient(circle, rgba(123,143,163,0.25) 0%, rgba(123,143,163,0.08) 40%, transparent 70%)",
               animation: "orbFloat 20s ease-in-out infinite",
               pointerEvents: "none", zIndex: 0,
             }} />
@@ -3018,7 +3038,7 @@ export default function BatcaveConsole() {
               <div style={{
                 width: "28px", height: "28px", color: C.amber, flexShrink: 0,
                 animation: "gentleDrift 6s ease-in-out infinite",
-                filter: "drop-shadow(0 0 8px rgba(123,143,163,0.2))",
+                filter: "drop-shadow(0 0 12px rgba(123,143,163,0.4))",
               }}>{I.bat}</div>
               {!collapsed && (
                 <span style={{ fontFamily: F.display, fontSize: "19px", color: C.cream, whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>Batcave</span>
@@ -3042,8 +3062,9 @@ export default function BatcaveConsole() {
             }}>{meta.mono}</div>
             {!isMobile && (
               <h1 style={{
-                fontFamily: F.display, fontSize: "46px", fontWeight: 300,
+                fontFamily: F.display, fontSize: "48px", fontWeight: 300,
                 color: C.cream, lineHeight: 1.05, marginBottom: "8px", letterSpacing: "-0.02em",
+                textShadow: "0 0 40px rgba(123,143,163,0.15)",
                 animation: "typeReveal 0.5s ease 0.15s both",
               }}>{meta.title}</h1>
             )}
@@ -3057,7 +3078,7 @@ export default function BatcaveConsole() {
           {/* Divider — animated gradient line */}
           <div style={{
             height: "1px", marginBottom: isMobile ? "24px" : "32px",
-            background: `linear-gradient(90deg, ${C.amber}60, ${C.amber}20, transparent 80%)`,
+            background: `linear-gradient(90deg, ${C.amber}, ${C.amber}50, transparent 70%)`,
             backgroundSize: "200% 100%",
             animation: "borderFlow 8s ease infinite",
           }} />
