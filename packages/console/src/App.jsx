@@ -475,53 +475,87 @@ function LoginScreen({ onLogin, isMobile }) {
 }
 
 // ─── Command Bar ─────────────────────────────────────────────────
-function CommandBar({ onClose, isMobile }) {
-  const [query, setQuery] = useState("");
+function CommandBar({ onClose, isMobile, session, onAction }) {
+  const [input, setInput] = useState("");
+  const [response, setResponse] = useState(null);
+  const [actions, setActions] = useState([]);
+  const [loading, setLoading] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  const commands = [
-    { label: "Deploy Omote", hint: "push to production", icon: I.deploy },
-    { label: "Check build status", hint: "all projects", icon: I.pulse },
-    { label: "Open Cerebro", hint: "GTM dashboard", icon: I.signal },
-    { label: "View agents", hint: "3 active", icon: I.agent },
-    { label: "New project", hint: "scaffold from template", icon: I.workspace },
-  ];
+  const connected = !!session?.access_token;
 
-  const filtered = commands.filter(c =>
-    c.label.toLowerCase().includes(query.toLowerCase()) ||
-    c.hint.toLowerCase().includes(query.toLowerCase())
-  );
+  const send = async () => {
+    if (!input.trim() || loading || !connected) return;
+    const msg = input.trim();
+    setInput("");
+    setLoading(true);
+    setResponse(null);
+    setActions([]);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ message: msg }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResponse(data.response);
+        setActions(data.actions || []);
+        if (data.actions?.some(a => a.ok)) onAction?.();
+      } else {
+        setResponse(data.error || "Request failed");
+      }
+    } catch {
+      setResponse("Network error");
+    }
+    setLoading(false);
+  };
 
   return (
     <div onClick={onClose} style={{
       position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.6)",
       backdropFilter: "blur(8px)", display: "flex", alignItems: "flex-start",
-      justifyContent: "center", paddingTop: isMobile ? "12vh" : "18vh",
-      padding: isMobile ? "12vh 16px 0" : undefined,
+      justifyContent: "center", paddingTop: isMobile ? "10vh" : "16vh",
+      padding: isMobile ? "10vh 16px 0" : undefined,
       zIndex: 200, animation: "fadeIn 0.15s ease",
     }}>
       <div onClick={e => e.stopPropagation()} style={{
-        width: "100%", maxWidth: "520px",
+        width: "100%", maxWidth: "560px",
         backgroundColor: C.cavern, border: `1px solid ${C.slate}`,
         borderRadius: "10px", overflow: "hidden",
         boxShadow: `0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px ${C.stone}`,
         animation: "slideUp 0.2s cubic-bezier(0.22,1,0.36,1)",
       }}>
+        {/* Input */}
         <div style={{
           display: "flex", alignItems: "center", gap: "10px",
           padding: isMobile ? "16px" : "14px 18px",
           borderBottom: `1px solid ${C.stone}`,
         }}>
-          <div style={{ width: "18px", height: "18px", color: C.amber, flexShrink: 0 }}>{I.search}</div>
-          <input ref={inputRef} value={query} onChange={e => setQuery(e.target.value)}
-            placeholder="Search commands, projects..."
+          <div style={{ width: "18px", height: "18px", color: loading ? C.caution : C.amber, flexShrink: 0 }}>{I.command}</div>
+          <input ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && send()}
+            placeholder={connected ? "Ask anything, create tasks, manage events..." : "Connect Anthropic key in Integrations"}
+            disabled={!connected}
             style={{
               flex: 1, background: "none", border: "none", outline: "none",
               fontFamily: F.sans, fontSize: isMobile ? "16px" : "15px", color: C.parchment,
+              opacity: connected ? 1 : 0.4,
             }}
           />
+          {connected && input.trim() && (
+            <button onClick={send} disabled={loading} style={{
+              background: C.amber, border: "none", borderRadius: "4px",
+              padding: "4px 10px", fontFamily: F.mono, fontSize: "11px",
+              color: C.obsidian, cursor: "pointer", fontWeight: 600,
+            }}>{loading ? "..." : "go"}</button>
+          )}
           <kbd style={{
             fontFamily: F.mono, fontSize: "10px", color: C.iron,
             padding: "2px 6px", borderRadius: "3px", backgroundColor: C.obsidian,
@@ -529,30 +563,43 @@ function CommandBar({ onClose, isMobile }) {
           }}>esc</kbd>
         </div>
 
-        <div style={{ padding: "6px 0", maxHeight: isMobile ? "50vh" : "320px", overflowY: "auto" }}>
-          {filtered.map((cmd, i) => (
-            <div key={i} style={{
-              display: "flex", alignItems: "center", gap: "12px",
-              padding: isMobile ? "14px 16px" : "10px 18px",
-              cursor: "pointer", minHeight: isMobile ? "48px" : undefined,
-              transition: "background-color 0.15s ease",
-            }}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = C.stone}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
-            >
-              <div style={{ width: "18px", height: "18px", color: C.iron, flexShrink: 0 }}>{cmd.icon}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: F.sans, fontSize: "14px", color: C.parchment }}>{cmd.label}</div>
-                <div style={{ fontFamily: F.mono, fontSize: "11px", color: C.iron, marginTop: "2px" }}>{cmd.hint}</div>
+        {/* Response area */}
+        {(response || loading) && (
+          <div style={{ padding: isMobile ? "16px" : "14px 18px", maxHeight: "50vh", overflowY: "auto" }}>
+            {loading && <div style={{ fontFamily: F.mono, fontSize: "12px", color: C.iron }}>thinking...</div>}
+            {response && (
+              <div style={{
+                fontFamily: F.sans, fontSize: "13px", color: C.parchment,
+                lineHeight: 1.65, whiteSpace: "pre-wrap",
+              }}>{response}</div>
+            )}
+            {actions.length > 0 && (
+              <div style={{ marginTop: "10px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                {actions.map((a, i) => (
+                  <div key={i} style={{
+                    fontFamily: F.mono, fontSize: "10px", padding: "4px 8px",
+                    borderRadius: "3px",
+                    backgroundColor: a.ok ? "rgba(90,138,106,0.1)" : "rgba(154,74,74,0.1)",
+                    color: a.ok ? C.success : C.danger,
+                  }}>{a.ok ? "done" : "fail"}: {a.action}</div>
+                ))}
               </div>
-            </div>
-          ))}
-          {filtered.length === 0 && (
-            <div style={{ padding: "20px 16px", fontFamily: F.sans, fontSize: "14px", color: C.iron, textAlign: "center" }}>
-              No matching commands
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
+
+        {/* Hints */}
+        {!response && !loading && connected && (
+          <div style={{ padding: "8px 18px 12px", display: "flex", gap: "6px", flexWrap: "wrap" }}>
+            {["add task", "what's overdue?", "schedule event", "brief me"].map(hint => (
+              <button key={hint} onClick={() => { setInput(hint); inputRef.current?.focus(); }} style={{
+                background: C.stone, border: "none", borderRadius: "3px",
+                padding: "4px 10px", fontFamily: F.mono, fontSize: "10px",
+                color: C.fog, cursor: "pointer",
+              }}>{hint}</button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -830,7 +877,112 @@ function ProjectsModule({ isMobile, liveData }) {
 }
 
 // ─── Homepage Module ─────────────────────────────────────────────
-function HomepageModule({ isMobile, session }) {
+// ─── Quick Command (inline, for Home page) ──────────────────────
+function QuickCommand({ isMobile, session, triggerRefresh }) {
+  const [input, setInput] = useState("");
+  const [response, setResponse] = useState(null);
+  const [actions, setActions] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const connected = !!session?.access_token;
+
+  const send = async () => {
+    if (!input.trim() || loading || !connected) return;
+    const msg = input.trim();
+    setInput("");
+    setLoading(true);
+    setResponse(null);
+    setActions([]);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ message: msg }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResponse(data.response);
+        setActions(data.actions || []);
+        if (data.actions?.some(a => a.ok)) triggerRefresh?.();
+      } else {
+        setResponse(data.error || "Failed");
+      }
+    } catch {
+      setResponse("Network error");
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ marginBottom: "24px" }}>
+      <div style={{
+        display: "flex", gap: "8px", alignItems: "stretch",
+      }}>
+        <div style={{
+          flex: 1, display: "flex", alignItems: "center", gap: "8px",
+          background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
+          padding: isMobile ? "10px 14px" : "8px 14px",
+          transition: "border-color 0.2s ease",
+        }}>
+          <div style={{ width: "16px", height: "16px", color: C.iron, flexShrink: 0 }}>{I.command}</div>
+          <input value={input} onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && send()}
+            placeholder={connected ? "Quick command... add task, schedule event, ask anything" : "Connect Anthropic in Integrations"}
+            disabled={!connected}
+            style={{
+              flex: 1, background: "none", border: "none", outline: "none",
+              fontFamily: F.sans, fontSize: isMobile ? "14px" : "13px", color: C.parchment,
+              opacity: connected ? 1 : 0.4,
+            }}
+          />
+        </div>
+        {connected && input.trim() && (
+          <button onClick={send} disabled={loading} style={{
+            background: C.amber, border: "none", borderRadius: "6px",
+            padding: isMobile ? "10px 16px" : "8px 14px",
+            fontFamily: F.mono, fontSize: "11px", fontWeight: 600,
+            color: C.obsidian, cursor: "pointer", whiteSpace: "nowrap",
+          }}>{loading ? "..." : "go"}</button>
+        )}
+      </div>
+
+      {/* Inline response */}
+      {(response || loading) && (
+        <div style={{
+          marginTop: "8px", padding: "10px 14px", borderRadius: "6px",
+          backgroundColor: C.cavern, border: `1px solid ${C.stone}`,
+          animation: "fadeUp 0.2s ease both",
+        }}>
+          {loading && <div style={{ fontFamily: F.mono, fontSize: "11px", color: C.iron }}>thinking...</div>}
+          {response && (
+            <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.fog, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{response}</div>
+          )}
+          {actions.length > 0 && (
+            <div style={{ marginTop: "6px", display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              {actions.map((a, i) => (
+                <span key={i} style={{
+                  fontFamily: F.mono, fontSize: "9px", padding: "2px 6px", borderRadius: "3px",
+                  backgroundColor: a.ok ? "rgba(90,138,106,0.1)" : "rgba(154,74,74,0.1)",
+                  color: a.ok ? C.success : C.danger,
+                }}>{a.ok ? "done" : "fail"}: {a.action}</span>
+              ))}
+            </div>
+          )}
+          <button onClick={() => { setResponse(null); setActions([]); }} style={{
+            background: "none", border: "none", cursor: "pointer",
+            fontFamily: F.mono, fontSize: "9px", color: C.slate, marginTop: "6px",
+          }}>dismiss</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
   const [markets, setMarkets] = useState(null);
   const [news, setNews] = useState(null);
   const [brief, setBrief] = useState(null);
@@ -932,6 +1084,9 @@ function HomepageModule({ isMobile, session }) {
           </div>
         ) : null}
       </div>
+
+      {/* Quick Command */}
+      <QuickCommand isMobile={isMobile} session={session} triggerRefresh={triggerRefresh} />
 
       {/* Market Indices */}
       <div style={{ marginBottom: "32px" }}>
@@ -1473,7 +1628,7 @@ function UsageMonitor({ isMobile, session }) {
 }
 
 // ─── Tasks Module (Calendar View) ────────────────────────────────
-function TasksModule({ isMobile, session }) {
+function TasksModule({ isMobile, session, refreshKey }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -1497,7 +1652,7 @@ function TasksModule({ isMobile, session }) {
     setLoading(false);
   }, [session]);
 
-  useEffect(() => { fetchTasks(); }, [fetchTasks]);
+  useEffect(() => { fetchTasks(); }, [fetchTasks, refreshKey]);
 
   const addTask = async () => {
     if (!newTitle.trim()) return;
@@ -1731,7 +1886,7 @@ function TasksModule({ isMobile, session }) {
 }
 
 // ─── Chat Shell ──────────────────────────────────────────────────
-function ChatShell({ isMobile, session, liveData }) {
+function ChatShell({ isMobile, session, liveData, triggerRefresh }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -1764,6 +1919,7 @@ function ChatShell({ isMobile, session, liveData }) {
             a.ok ? `  [ok] ${a.action}` : `  [fail] ${a.action}: ${a.error}`
           ).join("\n");
           responseText += `\n\n--- actions executed ---\n${actionSummary}`;
+          if (data.actions.some(a => a.ok)) triggerRefresh?.();
         }
         // Show token usage
         if (data.usage) {
@@ -1884,7 +2040,7 @@ function ChatShell({ isMobile, session, liveData }) {
 }
 
 // ─── Calendar Module ─────────────────────────────────────────────
-function CalendarModule({ isMobile, session }) {
+function CalendarModule({ isMobile, session, refreshKey }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewDate, setViewDate] = useState(new Date());
@@ -1915,7 +2071,7 @@ function CalendarModule({ isMobile, session }) {
     setLoading(false);
   }, [session, viewDate]);
 
-  useEffect(() => { fetchEvents(); }, [fetchEvents]);
+  useEffect(() => { fetchEvents(); }, [fetchEvents, refreshKey]);
 
   const addEvent = async () => {
     if (!newTitle.trim() || !newStart) return;
@@ -2254,7 +2410,10 @@ export default function BatcaveConsole() {
   const [collapsed, setCollapsed] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const liveData = useLiveData();
+
+  const triggerRefresh = useCallback(() => setRefreshKey(k => k + 1), []);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -2379,7 +2538,7 @@ export default function BatcaveConsole() {
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.2 // batcave</span>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.3 // batcave</span>
           {auth.session && (
             <button onClick={auth.signOut} style={{
               background: "none", border: "none", cursor: "pointer",
@@ -2538,10 +2697,10 @@ export default function BatcaveConsole() {
           }} />
 
           <div key={activeModule + "-content"}>
-            {activeModule === "home" && <HomepageModule isMobile={isMobile} session={auth.session} />}
-            {activeModule === "command" && <ChatShell isMobile={isMobile} session={auth.session} liveData={liveData} />}
-            {activeModule === "tasks" && <TasksModule isMobile={isMobile} session={auth.session} />}
-            {activeModule === "calendar" && <CalendarModule isMobile={isMobile} session={auth.session} />}
+            {activeModule === "home" && <HomepageModule isMobile={isMobile} session={auth.session} refreshKey={refreshKey} triggerRefresh={triggerRefresh} />}
+            {activeModule === "command" && <ChatShell isMobile={isMobile} session={auth.session} liveData={liveData} triggerRefresh={triggerRefresh} />}
+            {activeModule === "tasks" && <TasksModule isMobile={isMobile} session={auth.session} refreshKey={refreshKey} />}
+            {activeModule === "calendar" && <CalendarModule isMobile={isMobile} session={auth.session} refreshKey={refreshKey} />}
             {activeModule === "projects" && <ProjectsModule isMobile={isMobile} liveData={liveData} />}
             {activeModule === "integrations" && <IntegrationsModule isMobile={isMobile} liveData={liveData} session={auth.session} />}
             {!["home","command","tasks","calendar","projects","integrations"].includes(activeModule) && placeholders[activeModule] && (
@@ -2551,7 +2710,7 @@ export default function BatcaveConsole() {
         </main>
       </div>
 
-      {commandOpen && <CommandBar onClose={() => setCommandOpen(false)} isMobile={isMobile} />}
+      {commandOpen && <CommandBar onClose={() => setCommandOpen(false)} isMobile={isMobile} session={auth.session} onAction={triggerRefresh} />}
     </div>
   );
 }
