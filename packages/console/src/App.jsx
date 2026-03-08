@@ -101,6 +101,92 @@ const manifest = {
   ],
 };
 
+// ─── Integration Registry ────────────────────────────────────────
+const INTEGRATIONS = {
+  github: { id: "github", label: "GitHub", desc: "Repo commits, branches, PR status", envKey: "GH_TOKEN" },
+  vercel: { id: "vercel", label: "Vercel", desc: "Deploy status, build logs, domains", envKey: "VERCEL_API_TOKEN" },
+  gmail: { id: "gmail", label: "Gmail", desc: "Priority inbox, email threads", envKey: "GMAIL_TOKEN" },
+  gcal: { id: "gcal", label: "Google Calendar", desc: "Daily agenda, scheduling, events", envKey: "GCAL_TOKEN" },
+};
+
+// Vercel project IDs for live deploy lookup
+const VERCEL_IDS = {
+  console: "prj_5o6SPKonQDOvMgaK1A5vTrUy5ACh",
+  omote: "prj_D9l2XVJoH7yLlkwiqDQ6S7CbfMDV",
+  cerebro: "prj_GB9PR30jjMGHZRXXlk2OnK4ivJCM",
+  "run-recipes": "prj_PnlNhjWnZJhyiFeG1YqatJCPeUFF",
+};
+
+const VERCEL_TEAM = "team_KhfsGH2C6La9tyHfxicteccL";
+
+// ─── Live Data Hook ──────────────────────────────────────────────
+function useLiveData() {
+  const [status, setStatus] = useState(null);
+  const [gitData, setGitData] = useState({});
+  const [deployData, setDeployData] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      // 1. Check integration status
+      const statusRes = await fetch("/api/status");
+      if (!statusRes.ok) throw new Error("Status check failed");
+      const st = await statusRes.json();
+      setStatus(st);
+
+      // 2. Fetch GitHub data if connected
+      if (st.github?.connected) {
+        const repos = manifest.projects.filter(p => p.repo).map(p => p.repo);
+        const gitResults = {};
+        await Promise.all(repos.map(async (repo) => {
+          try {
+            const res = await fetch(`/api/github?path=repos/${repo}/commits/main`);
+            if (res.ok) {
+              const d = await res.json();
+              gitResults[repo] = {
+                sha: d.sha?.slice(0, 7),
+                message: d.commit?.message?.split("\n")[0],
+                date: d.commit?.author?.date?.slice(0, 10),
+                author: d.commit?.author?.name,
+              };
+            }
+          } catch {}
+        }));
+        setGitData(gitResults);
+      }
+
+      // 3. Fetch Vercel data if connected
+      if (st.vercel?.connected) {
+        const deployResults = {};
+        await Promise.all(Object.entries(VERCEL_IDS).map(async ([slug, projId]) => {
+          try {
+            const res = await fetch(`/api/deployments?projectId=${projId}&teamId=${VERCEL_TEAM}&limit=3`);
+            if (res.ok) {
+              const d = await res.json();
+              const deps = d.deployments || [];
+              const prod = deps.find(d => d.target === "production");
+              const preview = deps.find(d => d.target !== "production");
+              deployResults[slug] = { production: prod, preview };
+            }
+          } catch {}
+        }));
+        setDeployData(deployResults);
+      }
+
+      setLastRefresh(new Date());
+    } catch (err) {
+      console.error("Live data fetch failed:", err);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  return { status, gitData, deployData, loading, lastRefresh, refresh };
+}
+
 // ─── Icons ───────────────────────────────────────────────────────
 const I = {
   command: (
@@ -356,7 +442,7 @@ function LinkChip({ href, label, icon }) {
 }
 
 // ─── Project Card ────────────────────────────────────────────────
-function ProjectCard({ project, index, isMobile }) {
+function ProjectCard({ project, index, isMobile, liveGit, liveDeploy }) {
   const [expanded, setExpanded] = useState(false);
   const sc = statusConfig[project.status];
   const p = project;
@@ -430,37 +516,52 @@ function ProjectCard({ project, index, isMobile }) {
           padding: isMobile ? "14px 16px" : "16px 20px",
           animation: "fadeUp 0.2s ease both",
         }}>
-          {/* Deploy status row */}
-          {(p.production || p.staging) && (
+          {/* Deploy status row — live data preferred */}
+          {(liveDeploy || p.production || p.staging) && (
             <div style={{ display: "flex", gap: isMobile ? "16px" : "32px", marginBottom: "14px", flexWrap: "wrap" }}>
-              {p.production && (
+              {(liveDeploy?.production || p.production) && (
                 <div>
                   <div style={{ fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.08em", textTransform: "uppercase", color: C.iron, marginBottom: "4px" }}>Production</div>
-                  <DeployBadge state={p.production.state} />
+                  <DeployBadge state={liveDeploy?.production?.state || p.production?.state} />
+                  {liveDeploy?.production && (
+                    <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, marginTop: "3px" }}>
+                      {new Date(liveDeploy.production.created).toLocaleDateString()}
+                    </div>
+                  )}
                 </div>
               )}
-              {p.staging && (
+              {(liveDeploy?.preview || p.staging) && (
                 <div>
-                  <div style={{ fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.08em", textTransform: "uppercase", color: C.iron, marginBottom: "4px" }}>Staging</div>
-                  <DeployBadge state={p.staging.state} />
+                  <div style={{ fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.08em", textTransform: "uppercase", color: C.iron, marginBottom: "4px" }}>Preview</div>
+                  <DeployBadge state={liveDeploy?.preview?.state || p.staging?.state} />
+                  {liveDeploy?.preview && (
+                    <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, marginTop: "3px" }}>
+                      {liveDeploy.preview.meta?.githubCommitRef || "dev"}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
 
-          {/* Git info */}
-          {p.git && (
-            <div style={{
-              backgroundColor: C.obsidian, borderRadius: "4px",
-              padding: isMobile ? "12px" : "12px 14px",
-              fontFamily: F.mono, fontSize: isMobile ? "11px" : "10px",
-              lineHeight: 1.7, color: C.fog,
-            }}>
-              <div><span style={{ color: C.iron }}>branch:</span> <span style={{ color: C.parchment }}>{p.git.branch}</span></div>
-              <div><span style={{ color: C.iron }}>commit:</span> <span style={{ color: C.amber }}>{p.git.sha}</span> <span style={{ color: C.iron }}>{p.git.date}</span></div>
-              <div style={{ color: C.fog, marginTop: "4px" }}>{p.git.message}</div>
-            </div>
-          )}
+          {/* Git info — live data preferred */}
+          {(liveGit || p.git) && (() => {
+            const g = liveGit || p.git;
+            return (
+              <div style={{
+                backgroundColor: C.obsidian, borderRadius: "4px",
+                padding: isMobile ? "12px" : "12px 14px",
+                fontFamily: F.mono, fontSize: isMobile ? "11px" : "10px",
+                lineHeight: 1.7, color: C.fog,
+              }}>
+                {liveGit && <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.success, marginBottom: "4px", letterSpacing: "0.06em" }}>LIVE</div>}
+                <div><span style={{ color: C.iron }}>branch:</span> <span style={{ color: C.parchment }}>{g.branch || "main"}</span></div>
+                <div><span style={{ color: C.iron }}>commit:</span> <span style={{ color: C.amber }}>{g.sha}</span> <span style={{ color: C.iron }}>{g.date}</span></div>
+                {g.author && <div><span style={{ color: C.iron }}>author:</span> <span style={{ color: C.fog }}>{g.author}</span></div>}
+                <div style={{ color: C.fog, marginTop: "4px" }}>{g.message}</div>
+              </div>
+            );
+          })()}
 
           {/* Meta row */}
           <div style={{
@@ -479,9 +580,10 @@ function ProjectCard({ project, index, isMobile }) {
 }
 
 // ─── Projects Module (Dashboard) ─────────────────────────────────
-function ProjectsModule({ isMobile }) {
+function ProjectsModule({ isMobile, liveData }) {
+  const { gitData, deployData, status, loading, lastRefresh, refresh } = liveData || {};
   const active = manifest.projects.filter(p => p.status === "active");
-  const deployed = manifest.projects.filter(p => p.production?.state === "READY");
+  const liveDeployed = Object.values(deployData || {}).filter(d => d.production?.state === "READY").length;
 
   return (
     <div>
@@ -490,12 +592,12 @@ function ProjectsModule({ isMobile }) {
         display: "grid",
         gridTemplateColumns: isMobile ? "repeat(4, 1fr)" : "repeat(4, auto)",
         gap: isMobile ? "16px" : "40px",
-        marginBottom: "32px", animation: "fadeUp 0.4s ease both",
+        marginBottom: "24px", animation: "fadeUp 0.4s ease both",
       }}>
         {[
           { label: "Total", value: manifest.projects.length },
           { label: "Active", value: active.length },
-          { label: "Deployed", value: deployed.length },
+          { label: "Deployed", value: status?.vercel?.connected ? liveDeployed : "—" },
           { label: "In-Repo", value: manifest.projects.filter(p => p.migrated).length },
         ].map(stat => (
           <div key={stat.label}>
@@ -505,9 +607,141 @@ function ProjectsModule({ isMobile }) {
         ))}
       </div>
 
+      {/* Live data status bar */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px",
+        fontFamily: F.mono, fontSize: "10px", color: C.iron, flexWrap: "wrap",
+      }}>
+        {loading && <span style={{ color: C.caution }}>fetching live data...</span>}
+        {!loading && lastRefresh && (
+          <span>live as of {lastRefresh.toLocaleTimeString()}</span>
+        )}
+        {!loading && !status && (
+          <span>static data — connect integrations for live updates</span>
+        )}
+        <button onClick={refresh} style={{
+          background: "none", border: `1px solid ${C.slate}`, borderRadius: "3px",
+          padding: "2px 8px", fontFamily: F.mono, fontSize: "10px", color: C.amber,
+          cursor: "pointer", minHeight: isMobile ? "32px" : undefined,
+        }}>refresh</button>
+      </div>
+
       {/* Project cards */}
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-        {manifest.projects.map((p, i) => <ProjectCard key={p.slug} project={p} index={i} isMobile={isMobile} />)}
+        {manifest.projects.map((p, i) => (
+          <ProjectCard key={p.slug} project={p} index={i} isMobile={isMobile}
+            liveGit={p.repo ? gitData?.[p.repo] : null}
+            liveDeploy={deployData?.[p.slug]}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Integrations Module ─────────────────────────────────────────
+function IntegrationsModule({ isMobile, liveData }) {
+  const { status, loading, refresh } = liveData || {};
+  const integrationList = Object.values(INTEGRATIONS);
+
+  const icons = {
+    github: I.external,
+    vercel: I.deploy,
+    gmail: I.layers,
+    gcal: I.layers,
+  };
+
+  return (
+    <div style={{ animation: "fadeUp 0.4s ease both" }}>
+      <p style={{
+        fontFamily: F.body, fontSize: "15px", fontWeight: 300,
+        color: C.fog, marginBottom: "32px", maxWidth: "520px", lineHeight: 1.65,
+      }}>
+        Manage connections to external services. Connected integrations push live data to the dashboard.
+      </p>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+        {integrationList.map((intg, i) => {
+          const st = status?.[intg.id];
+          const connected = st?.connected || false;
+          return (
+            <div key={intg.id} style={{
+              backgroundColor: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
+              padding: isMobile ? "16px" : "18px 20px",
+              display: "flex", alignItems: "center", gap: "14px",
+              animation: `fadeUp 0.35s ease ${0.06 * i}s both`,
+              transition: "border-color 0.3s ease",
+            }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = C.slate}
+              onMouseLeave={e => e.currentTarget.style.borderColor = C.stone}
+            >
+              <div style={{
+                width: "20px", height: "20px", color: connected ? C.amber : C.iron, flexShrink: 0,
+              }}>{icons[intg.id] || I.layers}</div>
+
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontFamily: F.sans, fontSize: "14px", fontWeight: 600, color: C.parchment }}>{intg.label}</span>
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", gap: "4px",
+                    fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.06em",
+                    padding: "2px 8px", borderRadius: "3px",
+                    backgroundColor: connected ? "rgba(90,138,106,0.12)" : "rgba(154,74,74,0.12)",
+                    color: connected ? C.success : C.danger,
+                    border: `1px solid ${connected ? "rgba(90,138,106,0.2)" : "rgba(154,74,74,0.2)"}`,
+                  }}>
+                    <span style={{
+                      width: "5px", height: "5px", borderRadius: "50%",
+                      backgroundColor: connected ? C.success : C.danger,
+                    }} />
+                    {connected ? "connected" : "not connected"}
+                  </span>
+                </div>
+                <div style={{ fontFamily: F.sans, fontSize: "12px", color: C.iron, marginTop: "3px" }}>{intg.desc}</div>
+              </div>
+
+              {/* Env var hint */}
+              <div style={{
+                fontFamily: F.mono, fontSize: "9px", color: C.slate,
+                textAlign: "right", flexShrink: 0,
+              }}>
+                {intg.envKey}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Setup instructions */}
+      <div style={{
+        marginTop: "32px", padding: isMobile ? "16px" : "20px",
+        backgroundColor: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
+      }}>
+        <div style={{
+          fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.08em",
+          textTransform: "uppercase", color: C.amber, marginBottom: "12px",
+        }}>Setup</div>
+        <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.fog, lineHeight: 1.8 }}>
+          <div>Add environment variables in Vercel to connect integrations.</div>
+          <div style={{ marginTop: "8px" }}>
+            <a href="https://vercel.com/anthonyschroeck-wqs-projects/batcave/settings/environment-variables"
+              target="_blank" rel="noopener noreferrer"
+              style={{ color: C.amber, textDecoration: "none" }}>
+              Open Vercel Environment Variables
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* Refresh */}
+      <div style={{ marginTop: "16px", display: "flex", gap: "10px", alignItems: "center" }}>
+        <button onClick={refresh} style={{
+          background: "none", border: `1px solid ${C.slate}`, borderRadius: "4px",
+          padding: isMobile ? "10px 16px" : "6px 14px", fontFamily: F.mono, fontSize: "11px",
+          color: C.amber, cursor: "pointer", minHeight: isMobile ? "44px" : undefined,
+        }}>
+          {loading ? "checking..." : "refresh status"}
+        </button>
       </div>
     </div>
   );
@@ -556,6 +790,7 @@ export default function BatcaveConsole() {
   const [collapsed, setCollapsed] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const liveData = useLiveData();
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -585,6 +820,7 @@ export default function BatcaveConsole() {
     { id: "tasks", label: "Tasks", icon: I.tasks },
     { id: "fitness", label: "Fitness", icon: I.pulse },
     { id: "calendar", label: "Calendar", icon: I.layers },
+    { id: "integrations", label: "Integrations", icon: I.settings },
   ];
 
   const moduleMeta = {
@@ -592,7 +828,8 @@ export default function BatcaveConsole() {
     agents: { title: "Agents", mono: "Autonomous Systems", subtitle: "Build and manage autonomous workflows" },
     tasks: { title: "Tasks", mono: "Personal Ops", subtitle: "Priority-driven task management" },
     fitness: { title: "Fitness", mono: "Performance", subtitle: "Workouts, nutrition, recovery tracking" },
-    calendar: { title: "Calendar", mono: "Integrations", subtitle: "Unified calendar and email view" },
+    calendar: { title: "Calendar", mono: "Scheduling", subtitle: "Unified calendar and email view" },
+    integrations: { title: "Integrations", mono: "Admin", subtitle: "Manage service connections" },
   };
 
   const placeholders = {
@@ -647,11 +884,6 @@ export default function BatcaveConsole() {
               onClick={() => selectModule(mod.id)} />
           </div>
         ))}
-        <div style={{ height: "1px", backgroundColor: C.stone, margin: "8px 12px" }} />
-        <div style={{ animation: mounted ? "fadeUp 0.3s ease 0.3s both" : "none" }}>
-          <NavItem icon={I.settings} label="Settings" collapsed={!isMobile && collapsed}
-            isMobile={isMobile} onClick={() => {}} />
-        </div>
       </div>
 
       {/* Command shortcut */}
@@ -683,7 +915,7 @@ export default function BatcaveConsole() {
         <div style={{
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em",
-        }}>v2.4 // batcave</div>
+        }}>v2.5 // batcave</div>
       )}
     </>
   );
@@ -835,8 +1067,9 @@ export default function BatcaveConsole() {
           }} />
 
           <div key={activeModule + "-content"}>
-            {activeModule === "projects" && <ProjectsModule isMobile={isMobile} />}
-            {activeModule !== "projects" && placeholders[activeModule] && (
+            {activeModule === "projects" && <ProjectsModule isMobile={isMobile} liveData={liveData} />}
+            {activeModule === "integrations" && <IntegrationsModule isMobile={isMobile} liveData={liveData} />}
+            {activeModule !== "projects" && activeModule !== "integrations" && placeholders[activeModule] && (
               <PlaceholderModule description={placeholders[activeModule].description} items={placeholders[activeModule].items} isMobile={isMobile} />
             )}
           </div>
