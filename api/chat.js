@@ -60,6 +60,14 @@ async function executeActions(actions, jwt) {
       } else if (action.type === "complete_task") {
         await supabase.from("batcave_tasks").update({ completed: true }).eq("id", action.id);
         results.push({ action: "complete_task", ok: true, id: action.id });
+      } else if (action.type === "update_task") {
+        const updates = {};
+        if (action.title) updates.title = action.title;
+        if (action.priority) updates.priority = action.priority;
+        if (action.due_date !== undefined) updates.due_date = action.due_date;
+        if (action.completed !== undefined) updates.completed = action.completed;
+        await supabase.from("batcave_tasks").update(updates).eq("id", action.id);
+        results.push({ action: "update_task", ok: true, id: action.id });
       } else if (action.type === "delete_task") {
         await supabase.from("batcave_tasks").delete().eq("id", action.id);
         results.push({ action: "delete_task", ok: true, id: action.id });
@@ -73,6 +81,15 @@ async function executeActions(actions, jwt) {
           })
           .select().single();
         results.push({ action: "create_event", ok: true, event: data });
+      } else if (action.type === "update_event") {
+        const updates = {};
+        if (action.title) updates.title = action.title;
+        if (action.start_date) updates.start_date = action.start_date;
+        if (action.end_date) updates.end_date = action.end_date;
+        if (action.category) updates.category = action.category;
+        if (action.location !== undefined) updates.location = action.location;
+        await supabase.from("batcave_events").update(updates).eq("id", action.id);
+        results.push({ action: "update_event", ok: true, id: action.id });
       } else if (action.type === "delete_event") {
         await supabase.from("batcave_events").delete().eq("id", action.id);
         results.push({ action: "delete_event", ok: true, id: action.id });
@@ -109,17 +126,20 @@ CAPABILITIES — you can take actions by including a JSON block in your response
 [
   {"type": "create_task", "title": "...", "priority": "high|medium|low", "due_date": "YYYY-MM-DD"},
   {"type": "complete_task", "id": "task-uuid"},
+  {"type": "update_task", "id": "task-uuid", "title": "...", "priority": "...", "due_date": "..."},
   {"type": "delete_task", "id": "task-uuid"},
   {"type": "create_event", "title": "...", "start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD", "category": "personal|professional|travel|health|project", "location": "..."},
+  {"type": "update_event", "id": "event-uuid", "title": "...", "start_date": "...", "end_date": "...", "category": "...", "location": "..."},
   {"type": "delete_event", "id": "event-uuid"}
 ]
 \`\`\`
 
 RULES:
 - Be concise. No filler.
-- When asked to create/modify/delete tasks or events, include the actions block AND a brief confirmation.
+- When asked to create/modify/delete/reschedule tasks or events, include the actions block AND a brief confirmation.
 - When asked questions, answer from context. Don't guess.
 - Use the task/event IDs from context when referencing existing items.
+- For updates, only include the fields that are changing.
 - Today's date is ${new Date().toISOString().slice(0, 10)}.
 - Dates like "friday", "next tuesday" should resolve to actual YYYY-MM-DD dates.`;
 
