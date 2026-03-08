@@ -6,6 +6,7 @@ export default async function handler(req, res) {
   const services = {
     github: { connected: false, label: "GitHub" },
     finnhub: { connected: false, label: "Finnhub" },
+    anthropic: { connected: false, label: "Anthropic" },
     gmail: { connected: false, label: "Gmail" },
     gcal: { connected: false, label: "Google Calendar" },
   };

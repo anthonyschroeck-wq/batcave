@@ -13,9 +13,25 @@ const VALIDATORS = {
     });
     return r.ok;
   },
+  anthropic: async (key) => {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 10,
+        messages: [{ role: "user", content: "ping" }],
+      }),
+    });
+    return r.ok;
+  },
 };
 
-const SERVICE_LABELS = { finnhub: "Finnhub", github: "GitHub" };
+const SERVICE_LABELS = { finnhub: "Finnhub", github: "GitHub", anthropic: "Anthropic" };
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
