@@ -159,6 +159,7 @@ const manifest = {
 const INTEGRATIONS = {
   finnhub: { id: "finnhub", label: "Finnhub", desc: "Stock quotes, market news, indices" },
   github: { id: "github", label: "GitHub", desc: "Repo commits, branches, PR status" },
+  anthropic: { id: "anthropic", label: "Anthropic", desc: "Command prompt — Claude AI for task and project management" },
   gmail: { id: "gmail", label: "Gmail", desc: "Priority inbox, email threads" },
   gcal: { id: "gcal", label: "Google Calendar", desc: "Daily agenda, scheduling, events" },
 };
@@ -1041,6 +1042,7 @@ function IntegrationsModule({ isMobile, liveData, session }) {
   const icons = {
     finnhub: I.signal,
     github: I.external,
+    anthropic: I.command,
     gmail: I.layers,
     gcal: I.layers,
   };
@@ -1058,6 +1060,14 @@ function IntegrationsModule({ isMobile, liveData, session }) {
       steps: [
         { text: "Create a fine-grained PAT", link: "https://github.com/settings/personal-access-tokens/new", linkLabel: "Create token" },
         { text: "Scope: select repos, Contents read/write, Metadata read" },
+        { text: "Paste it below" },
+      ],
+      configurable: true,
+    },
+    anthropic: {
+      steps: [
+        { text: "Open the Anthropic Console", link: "https://console.anthropic.com/settings/keys", linkLabel: "API keys" },
+        { text: "Create a key and copy it" },
         { text: "Paste it below" },
       ],
       configurable: true,
@@ -1282,6 +1292,405 @@ function IntegrationsModule({ isMobile, liveData, session }) {
   );
 }
 
+// ─── Tasks Module (Calendar View) ────────────────────────────────
+function TasksModule({ isMobile, session }) {
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newPriority, setNewPriority] = useState("medium");
+  const [newDue, setNewDue] = useState("");
+
+  const headers = session?.access_token
+    ? { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }
+    : { "Content-Type": "application/json" };
+
+  const fetchTasks = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/tasks", { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setTasks(data.tasks || []);
+      }
+    } catch {}
+    setLoading(false);
+  }, [session]);
+
+  useEffect(() => { fetchTasks(); }, [fetchTasks]);
+
+  const addTask = async () => {
+    if (!newTitle.trim()) return;
+    try {
+      await fetch("/api/tasks", {
+        method: "POST", headers,
+        body: JSON.stringify({ title: newTitle.trim(), priority: newPriority, due_date: newDue || null }),
+      });
+      setNewTitle(""); setNewPriority("medium"); setNewDue(""); setShowAdd(false);
+      fetchTasks();
+    } catch {}
+  };
+
+  const toggleComplete = async (task) => {
+    try {
+      await fetch("/api/tasks", {
+        method: "PATCH", headers,
+        body: JSON.stringify({ id: task.id, completed: !task.completed }),
+      });
+      fetchTasks();
+    } catch {}
+  };
+
+  const deleteTask = async (id) => {
+    try {
+      await fetch("/api/tasks", {
+        method: "DELETE", headers,
+        body: JSON.stringify({ id }),
+      });
+      fetchTasks();
+    } catch {}
+  };
+
+  // Group tasks by day
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  // Build 14-day calendar window
+  const days = [];
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() + i);
+    const key = d.toISOString().slice(0, 10);
+    const dayTasks = tasks.filter(t => t.due_date === key);
+    days.push({
+      date: d, key, dayTasks,
+      label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : dayNames[d.getDay()],
+      dateLabel: `${monthNames[d.getMonth()]} ${d.getDate()}`,
+    });
+  }
+
+  const overdue = tasks.filter(t => t.due_date && t.due_date < today.toISOString().slice(0, 10) && !t.completed);
+  const noDue = tasks.filter(t => !t.due_date);
+
+  const priorityColors = { high: C.danger, medium: C.amber, low: C.iron };
+  const priorityLabels = { high: "HIGH", medium: "MED", low: "LOW" };
+
+  const TaskRow = ({ task, index }) => (
+    <div style={{
+      display: "flex", alignItems: "center", gap: "10px",
+      padding: isMobile ? "10px 0" : "8px 0",
+      animation: `fadeUp 0.25s ease ${0.03 * index}s both`,
+      opacity: task.completed ? 0.4 : 1,
+    }}>
+      {/* Checkbox */}
+      <button onClick={() => toggleComplete(task)} style={{
+        width: isMobile ? "24px" : "20px", height: isMobile ? "24px" : "20px", flexShrink: 0,
+        borderRadius: "4px", cursor: "pointer",
+        background: task.completed ? C.success : "transparent",
+        border: `1.5px solid ${task.completed ? C.success : C.slate}`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: task.completed ? C.obsidian : "transparent", fontSize: "12px",
+      }}>
+        {task.completed && "✓"}
+      </button>
+
+      {/* Title */}
+      <div style={{
+        flex: 1, fontFamily: F.sans, fontSize: isMobile ? "14px" : "13px",
+        color: task.completed ? C.iron : C.parchment,
+        textDecoration: task.completed ? "line-through" : "none",
+      }}>{task.title}</div>
+
+      {/* Priority badge */}
+      <span style={{
+        fontFamily: F.mono, fontSize: "8px", letterSpacing: "0.06em",
+        padding: "2px 6px", borderRadius: "3px",
+        color: priorityColors[task.priority],
+        border: `1px solid ${priorityColors[task.priority]}30`,
+        backgroundColor: `${priorityColors[task.priority]}10`,
+      }}>{priorityLabels[task.priority]}</span>
+
+      {/* Delete */}
+      <button onClick={() => deleteTask(task.id)} style={{
+        background: "none", border: "none", cursor: "pointer",
+        color: C.slate, fontSize: "14px", padding: "4px",
+        minWidth: isMobile ? "32px" : undefined, minHeight: isMobile ? "32px" : undefined,
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>x</button>
+    </div>
+  );
+
+  const inputStyle = {
+    background: C.obsidian, border: `1px solid ${C.slate}`, borderRadius: "4px",
+    padding: isMobile ? "12px" : "8px 12px",
+    fontFamily: F.sans, fontSize: isMobile ? "16px" : "13px",
+    color: C.parchment, outline: "none", width: "100%",
+  };
+
+  return (
+    <div style={{ animation: "fadeUp 0.4s ease both" }}>
+      {/* Header bar */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+        <div style={{ fontFamily: F.mono, fontSize: "10px", color: C.iron }}>
+          {tasks.filter(t => !t.completed).length} open / {tasks.length} total
+        </div>
+        <button onClick={() => setShowAdd(!showAdd)} style={{
+          background: showAdd ? C.stone : C.amber, border: "none", borderRadius: "4px",
+          padding: isMobile ? "8px 14px" : "5px 12px",
+          fontFamily: F.mono, fontSize: "11px", color: showAdd ? C.iron : C.obsidian,
+          cursor: "pointer", fontWeight: 600, minHeight: isMobile ? "40px" : undefined,
+        }}>{showAdd ? "cancel" : "+ add task"}</button>
+      </div>
+
+      {/* Add task form */}
+      {showAdd && (
+        <div style={{
+          backgroundColor: C.cavern, border: `1px solid ${C.amber}`, borderRadius: "6px",
+          padding: isMobile ? "16px" : "16px 20px", marginBottom: "20px",
+          animation: "fadeUp 0.2s ease both",
+        }}>
+          <input value={newTitle} onChange={e => setNewTitle(e.target.value)}
+            placeholder="Task title..." style={{ ...inputStyle, marginBottom: "10px" }}
+            onKeyDown={e => e.key === "Enter" && addTask()}
+            onFocus={e => e.currentTarget.style.borderColor = C.amber}
+            onBlur={e => e.currentTarget.style.borderColor = C.slate}
+          />
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <select value={newPriority} onChange={e => setNewPriority(e.target.value)} style={{
+              ...inputStyle, width: "auto", cursor: "pointer",
+            }}>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+            <input type="date" value={newDue} onChange={e => setNewDue(e.target.value)}
+              style={{ ...inputStyle, width: "auto" }}
+            />
+            <button onClick={addTask} style={{
+              background: C.amber, border: "none", borderRadius: "4px",
+              padding: isMobile ? "10px 16px" : "8px 14px",
+              fontFamily: F.mono, fontSize: "12px", fontWeight: 600,
+              color: C.obsidian, cursor: "pointer",
+            }}>add</button>
+          </div>
+        </div>
+      )}
+
+      {loading && <div style={{ fontFamily: F.mono, fontSize: "12px", color: C.iron }}>Loading tasks...</div>}
+
+      {/* Overdue */}
+      {overdue.length > 0 && (
+        <div style={{ marginBottom: "20px" }}>
+          <div style={{
+            fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.08em",
+            textTransform: "uppercase", color: C.danger, marginBottom: "8px",
+          }}>Overdue</div>
+          <div style={{
+            backgroundColor: C.cavern, border: `1px solid ${C.danger}30`, borderRadius: "6px",
+            padding: isMobile ? "8px 14px" : "8px 16px",
+          }}>
+            {overdue.map((t, i) => <TaskRow key={t.id} task={t} index={i} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Calendar grid */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+        {days.map((day, i) => {
+          if (day.dayTasks.length === 0 && i > 7) return null; // Hide empty far-future days
+          const isToday = i === 0;
+          return (
+            <div key={day.key} style={{
+              display: "flex", gap: isMobile ? "10px" : "16px",
+              padding: isMobile ? "10px 0" : "8px 0",
+              borderBottom: `1px solid ${C.stone}`,
+              animation: `fadeUp 0.3s ease ${0.03 * i}s both`,
+              opacity: day.dayTasks.length === 0 ? 0.5 : 1,
+            }}>
+              {/* Date column */}
+              <div style={{
+                width: isMobile ? "60px" : "80px", flexShrink: 0,
+                fontFamily: F.mono, fontSize: "10px", paddingTop: "2px",
+              }}>
+                <div style={{ color: isToday ? C.amber : C.fog, fontWeight: isToday ? 600 : 400 }}>{day.label}</div>
+                <div style={{ color: C.iron, marginTop: "2px" }}>{day.dateLabel}</div>
+              </div>
+
+              {/* Tasks column */}
+              <div style={{ flex: 1 }}>
+                {day.dayTasks.length > 0 ? (
+                  day.dayTasks.map((t, j) => <TaskRow key={t.id} task={t} index={j} />)
+                ) : (
+                  <div style={{ fontFamily: F.sans, fontSize: "12px", color: C.slate, padding: "8px 0" }}>—</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* No-due-date tasks */}
+      {noDue.length > 0 && (
+        <div style={{ marginTop: "20px" }}>
+          <div style={{
+            fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.08em",
+            textTransform: "uppercase", color: C.iron, marginBottom: "8px",
+          }}>No due date</div>
+          <div style={{
+            backgroundColor: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
+            padding: isMobile ? "8px 14px" : "8px 16px",
+          }}>
+            {noDue.map((t, i) => <TaskRow key={t.id} task={t} index={i} />)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Chat Shell ──────────────────────────────────────────────────
+function ChatShell({ isMobile, session, liveData }) {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const inputRef = useRef(null);
+
+  const connected = liveData?.status?.anthropic?.connected || false;
+
+  const sendMessage = async () => {
+    if (!input.trim() || loading) return;
+    const userMsg = input.trim();
+    setInput("");
+    setMessages(prev => [...prev, { role: "user", text: userMsg }]);
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ message: userMsg }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMessages(prev => [...prev, { role: "assistant", text: data.response }]);
+      } else {
+        setMessages(prev => [...prev, { role: "error", text: data.error || "Request failed" }]);
+      }
+    } catch {
+      setMessages(prev => [...prev, { role: "error", text: "Network error" }]);
+    }
+    setLoading(false);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  };
+
+  const inputStyle = {
+    flex: 1, background: C.obsidian, border: `1px solid ${C.slate}`,
+    borderRadius: "4px", padding: isMobile ? "14px" : "10px 14px",
+    fontFamily: F.sans, fontSize: isMobile ? "16px" : "14px",
+    color: C.parchment, outline: "none",
+  };
+
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", height: isMobile ? "calc(100vh - 180px)" : "calc(100vh - 220px)",
+      animation: "fadeUp 0.4s ease both",
+    }}>
+      {/* Messages area */}
+      <div style={{
+        flex: 1, overflowY: "auto", marginBottom: "16px",
+        display: "flex", flexDirection: "column", gap: "12px",
+      }}>
+        {!connected && messages.length === 0 && (
+          <div style={{
+            padding: isMobile ? "20px" : "28px", borderRadius: "6px",
+            backgroundColor: C.cavern, border: `1px solid ${C.stone}`,
+            textAlign: "center",
+          }}>
+            <div style={{ fontFamily: F.display, fontSize: "20px", color: C.cream, marginBottom: "8px" }}>Command Prompt</div>
+            <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.iron, lineHeight: 1.6, marginBottom: "16px" }}>
+              Connect your Anthropic API key in Integrations to enable the command prompt. Once connected, you can manage tasks, query projects, and control the Batcave with natural language.
+            </div>
+            <div style={{
+              fontFamily: F.mono, fontSize: "10px", color: C.slate,
+              padding: "8px 14px", backgroundColor: C.obsidian, borderRadius: "4px",
+              display: "inline-block",
+            }}>ANTHROPIC_API_KEY not connected</div>
+          </div>
+        )}
+
+        {connected && messages.length === 0 && (
+          <div style={{
+            padding: isMobile ? "20px" : "28px", borderRadius: "6px",
+            backgroundColor: C.cavern, border: `1px solid ${C.stone}`,
+          }}>
+            <div style={{ fontFamily: F.display, fontSize: "20px", color: C.cream, marginBottom: "8px" }}>Command Prompt</div>
+            <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.iron, lineHeight: 1.6 }}>
+              Manage tasks, query status, control your projects. Try:
+            </div>
+            <div style={{ fontFamily: F.mono, fontSize: "12px", color: C.fog, marginTop: "12px", lineHeight: 2 }}>
+              <div style={{ color: C.amber }}>"add task: review Q1 metrics, high priority, due friday"</div>
+              <div style={{ color: C.amber }}>"what's the status of all projects?"</div>
+              <div style={{ color: C.amber }}>"deploy omote to production"</div>
+            </div>
+          </div>
+        )}
+
+        {messages.map((msg, i) => (
+          <div key={i} style={{
+            display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
+            animation: "fadeUp 0.2s ease both",
+          }}>
+            <div style={{
+              maxWidth: "80%", padding: isMobile ? "12px 14px" : "10px 14px", borderRadius: "6px",
+              fontFamily: msg.role === "assistant" ? F.sans : F.sans,
+              fontSize: "13px", lineHeight: 1.6,
+              backgroundColor: msg.role === "user" ? C.amberSubtle : msg.role === "error" ? "rgba(154,74,74,0.1)" : C.cavern,
+              border: `1px solid ${msg.role === "user" ? C.amberGlow : msg.role === "error" ? "rgba(154,74,74,0.2)" : C.stone}`,
+              color: msg.role === "error" ? C.danger : C.parchment,
+              whiteSpace: "pre-wrap",
+            }}>{msg.text}</div>
+          </div>
+        ))}
+
+        {loading && (
+          <div style={{
+            fontFamily: F.mono, fontSize: "12px", color: C.iron,
+            padding: "8px 14px",
+          }}>thinking...</div>
+        )}
+      </div>
+
+      {/* Input bar */}
+      <div style={{ display: "flex", gap: "8px", alignItems: "stretch" }}>
+        <input ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
+          placeholder={connected ? "Command..." : "Connect Anthropic key in Integrations"}
+          disabled={!connected}
+          onKeyDown={e => e.key === "Enter" && sendMessage()}
+          style={{
+            ...inputStyle,
+            opacity: connected ? 1 : 0.4,
+          }}
+          onFocus={e => e.currentTarget.style.borderColor = C.amber}
+          onBlur={e => e.currentTarget.style.borderColor = C.slate}
+        />
+        <button onClick={sendMessage} disabled={!connected || !input.trim() || loading} style={{
+          background: C.amber, border: "none", borderRadius: "4px",
+          padding: isMobile ? "14px 20px" : "10px 16px",
+          fontFamily: F.mono, fontSize: "12px", fontWeight: 600,
+          color: C.obsidian, cursor: connected ? "pointer" : "not-allowed",
+          opacity: !connected || !input.trim() || loading ? 0.4 : 1,
+          whiteSpace: "nowrap",
+        }}>send</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Placeholder Module ──────────────────────────────────────────
 function PlaceholderModule({ description, items, isMobile }) {
   return (
@@ -1365,9 +1774,10 @@ export default function BatcaveConsole() {
 
   const modules = [
     { id: "home", label: "Home", icon: I.home },
+    { id: "command", label: "Command", icon: I.command },
+    { id: "tasks", label: "Tasks", icon: I.tasks },
     { id: "projects", label: "Projects", icon: I.workspace },
     { id: "agents", label: "Agents", icon: I.agent },
-    { id: "tasks", label: "Tasks", icon: I.tasks },
     { id: "fitness", label: "Fitness", icon: I.pulse },
     { id: "calendar", label: "Calendar", icon: I.layers },
     { id: "integrations", label: "Integrations", icon: I.settings },
@@ -1375,9 +1785,10 @@ export default function BatcaveConsole() {
 
   const moduleMeta = {
     home: { title: "Briefing", mono: "Command Center", subtitle: new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) },
+    command: { title: "Command", mono: "Prompt", subtitle: "Natural language control" },
+    tasks: { title: "Tasks", mono: "Personal Ops", subtitle: "Priority-driven task management" },
     projects: { title: "Projects", mono: "System Registry", subtitle: `${manifest.projects.length} registered across the system` },
     agents: { title: "Agents", mono: "Autonomous Systems", subtitle: "Build and manage autonomous workflows" },
-    tasks: { title: "Tasks", mono: "Personal Ops", subtitle: "Priority-driven task management" },
     fitness: { title: "Fitness", mono: "Performance", subtitle: "Workouts, nutrition, recovery tracking" },
     calendar: { title: "Calendar", mono: "Scheduling", subtitle: "Unified calendar and email view" },
     integrations: { title: "Integrations", mono: "Admin", subtitle: "Manage service connections" },
@@ -1391,15 +1802,6 @@ export default function BatcaveConsole() {
         { label: "Monitor", title: "Repo Watcher", desc: "Track downstream changes" },
         { label: "Pipeline", title: "CI Orchestrator", desc: "Cross-package builds" },
         { label: "Research", title: "Scout", desc: "Surface signals from feeds" },
-      ],
-    },
-    tasks: {
-      description: "Personal task list with priority levels, project tagging, and completion tracking. Capture fast, focus deep.",
-      items: [
-        { label: "Inbox", title: "Capture", desc: "Quick-add from anywhere" },
-        { label: "Active", title: "Focus Queue", desc: "Today's priority stack" },
-        { label: "Backlog", title: "Someday", desc: "Parked ideas, deferred work" },
-        { label: "Review", title: "Weekly Review", desc: "Reflect and reprioritize" },
       ],
     },
     fitness: {
@@ -1467,7 +1869,7 @@ export default function BatcaveConsole() {
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v2.8 // batcave</span>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.0 // batcave</span>
           {auth.session && (
             <button onClick={auth.signOut} style={{
               background: "none", border: "none", cursor: "pointer",
@@ -1627,9 +2029,11 @@ export default function BatcaveConsole() {
 
           <div key={activeModule + "-content"}>
             {activeModule === "home" && <HomepageModule isMobile={isMobile} />}
+            {activeModule === "command" && <ChatShell isMobile={isMobile} session={auth.session} liveData={liveData} />}
+            {activeModule === "tasks" && <TasksModule isMobile={isMobile} session={auth.session} />}
             {activeModule === "projects" && <ProjectsModule isMobile={isMobile} liveData={liveData} />}
             {activeModule === "integrations" && <IntegrationsModule isMobile={isMobile} liveData={liveData} session={auth.session} />}
-            {!["home","projects","integrations"].includes(activeModule) && placeholders[activeModule] && (
+            {!["home","command","tasks","projects","integrations"].includes(activeModule) && placeholders[activeModule] && (
               <PlaceholderModule description={placeholders[activeModule].description} items={placeholders[activeModule].items} isMobile={isMobile} />
             )}
           </div>
