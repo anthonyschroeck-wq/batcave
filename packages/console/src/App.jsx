@@ -77,6 +77,12 @@ const C = {
   success: "#5a8a6a",
   caution: "#b89040",
   danger: "#9a4a4a",
+  // Depth palette — for ambient effects
+  void: "#0a0a0e",
+  abyss: "#0e0e14",
+  dusk: "rgba(123, 143, 163, 0.06)",
+  aurora: "rgba(123, 143, 163, 0.03)",
+  glint: "rgba(245, 241, 232, 0.04)",
 };
 
 const F = {
@@ -519,69 +525,96 @@ function CommandBar({ onClose, isMobile, session, onAction }) {
 
   return (
     <div onClick={onClose} style={{
-      position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.6)",
-      backdropFilter: "blur(8px)", display: "flex", alignItems: "flex-start",
+      position: "fixed", inset: 0,
+      backgroundColor: "rgba(10,10,14,0.75)",
+      backdropFilter: "blur(16px) saturate(120%)",
+      display: "flex", alignItems: "flex-start",
       justifyContent: "center", paddingTop: isMobile ? "10vh" : "16vh",
       padding: isMobile ? "10vh 16px 0" : undefined,
-      zIndex: 200, animation: "fadeIn 0.15s ease",
+      zIndex: 200, animation: "fadeIn 0.2s ease",
     }}>
       <div onClick={e => e.stopPropagation()} style={{
-        width: "100%", maxWidth: "560px",
-        backgroundColor: C.cavern, border: `1px solid ${C.slate}`,
-        borderRadius: "10px", overflow: "hidden",
-        boxShadow: `0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px ${C.stone}`,
-        animation: "slideUp 0.2s cubic-bezier(0.22,1,0.36,1)",
+        width: "100%", maxWidth: "560px", position: "relative",
+        backgroundColor: C.cavern,
+        border: `1px solid ${C.slate}`,
+        borderRadius: "12px", overflow: "hidden",
+        boxShadow: `0 32px 100px rgba(0,0,0,0.6), 0 0 0 1px ${C.stone}, 0 0 60px rgba(123,143,163,0.05)`,
+        animation: "slideUp 0.25s cubic-bezier(0.22,1,0.36,1)",
       }}>
+        {/* Top glow bar */}
+        <div style={{
+          position: "absolute", top: 0, left: "10%", right: "10%", height: "1px",
+          background: `linear-gradient(90deg, transparent, ${C.amber}60, transparent)`,
+          backgroundSize: "200% 100%",
+          animation: "borderFlow 4s ease infinite",
+        }} />
+
         {/* Input */}
         <div style={{
-          display: "flex", alignItems: "center", gap: "10px",
-          padding: isMobile ? "16px" : "14px 18px",
+          display: "flex", alignItems: "center", gap: "12px",
+          padding: isMobile ? "18px 16px" : "16px 20px",
           borderBottom: `1px solid ${C.stone}`,
         }}>
-          <div style={{ width: "18px", height: "18px", color: loading ? C.caution : C.amber, flexShrink: 0 }}>{I.command}</div>
+          <div style={{
+            width: "18px", height: "18px", flexShrink: 0,
+            color: loading ? C.caution : C.amber,
+            filter: loading ? "none" : "drop-shadow(0 0 6px rgba(123,143,163,0.3))",
+            transition: "filter 0.3s ease",
+          }}>{I.command}</div>
           <input ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === "Enter" && send()}
             placeholder={connected ? "Ask anything, create tasks, manage events..." : "Connect Anthropic key in Integrations"}
             disabled={!connected}
             style={{
               flex: 1, background: "none", border: "none", outline: "none",
-              fontFamily: F.sans, fontSize: isMobile ? "16px" : "15px", color: C.parchment,
+              fontFamily: F.body, fontSize: isMobile ? "16px" : "15px", color: C.cream,
+              fontWeight: 300, fontStyle: "italic",
               opacity: connected ? 1 : 0.4,
             }}
           />
           {connected && input.trim() && (
             <button onClick={send} disabled={loading} style={{
-              background: C.amber, border: "none", borderRadius: "4px",
-              padding: "4px 10px", fontFamily: F.mono, fontSize: "11px",
+              background: `linear-gradient(135deg, ${C.amber}, ${C.embers})`,
+              border: "none", borderRadius: "4px",
+              padding: "5px 12px", fontFamily: F.mono, fontSize: "10px",
               color: C.obsidian, cursor: "pointer", fontWeight: 600,
+              letterSpacing: "0.04em",
             }}>{loading ? "..." : "go"}</button>
           )}
           <kbd style={{
-            fontFamily: F.mono, fontSize: "10px", color: C.iron,
-            padding: "2px 6px", borderRadius: "3px", backgroundColor: C.obsidian,
-            border: `1px solid ${C.slate}`,
+            fontFamily: F.mono, fontSize: "9px", color: C.slate,
+            padding: "2px 6px", borderRadius: "3px", backgroundColor: C.void,
+            border: `1px solid ${C.stone}`,
           }}>esc</kbd>
         </div>
 
         {/* Response area */}
         {(response || loading) && (
-          <div style={{ padding: isMobile ? "16px" : "14px 18px", maxHeight: "50vh", overflowY: "auto" }}>
-            {loading && <div style={{ fontFamily: F.mono, fontSize: "12px", color: C.iron }}>thinking...</div>}
+          <div style={{ padding: isMobile ? "16px" : "16px 20px", maxHeight: "50vh", overflowY: "auto" }}>
+            {loading && (
+              <div style={{
+                fontFamily: F.mono, fontSize: "11px", color: C.iron,
+                animation: "breathe 2s ease infinite",
+              }}>thinking...</div>
+            )}
             {response && (
               <div style={{
-                fontFamily: F.sans, fontSize: "13px", color: C.parchment,
-                lineHeight: 1.65, whiteSpace: "pre-wrap",
+                fontFamily: F.body, fontSize: "13px", color: C.fog,
+                lineHeight: 1.7, whiteSpace: "pre-wrap", fontWeight: 300,
+                animation: "typeReveal 0.3s ease both",
               }}>{response}</div>
             )}
             {actions.length > 0 && (
-              <div style={{ marginTop: "10px", display: "flex", flexDirection: "column", gap: "4px" }}>
+              <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "4px" }}>
                 {actions.map((a, i) => (
                   <div key={i} style={{
-                    fontFamily: F.mono, fontSize: "10px", padding: "4px 8px",
-                    borderRadius: "3px",
-                    backgroundColor: a.ok ? "rgba(90,138,106,0.1)" : "rgba(154,74,74,0.1)",
+                    fontFamily: F.mono, fontSize: "9px", padding: "5px 10px",
+                    borderRadius: "3px", letterSpacing: "0.04em",
+                    backgroundColor: a.ok ? "rgba(90,138,106,0.08)" : "rgba(154,74,74,0.08)",
+                    borderLeft: `2px solid ${a.ok ? C.success : C.danger}`,
                     color: a.ok ? C.success : C.danger,
-                  }}>{a.ok ? "done" : "fail"}: {a.action}</div>
+                    animation: `typeReveal 0.3s ease ${0.1 * i}s both`,
+                  }}>{a.ok ? "executed" : "failed"}: {a.action}</div>
                 ))}
               </div>
             )}
@@ -590,13 +623,18 @@ function CommandBar({ onClose, isMobile, session, onAction }) {
 
         {/* Hints */}
         {!response && !loading && connected && (
-          <div style={{ padding: "8px 18px 12px", display: "flex", gap: "6px", flexWrap: "wrap" }}>
+          <div style={{ padding: "10px 20px 14px", display: "flex", gap: "6px", flexWrap: "wrap" }}>
             {["add task", "what's overdue?", "schedule event", "brief me"].map(hint => (
               <button key={hint} onClick={() => { setInput(hint); inputRef.current?.focus(); }} style={{
-                background: C.stone, border: "none", borderRadius: "3px",
-                padding: "4px 10px", fontFamily: F.mono, fontSize: "10px",
-                color: C.fog, cursor: "pointer",
-              }}>{hint}</button>
+                background: "transparent", border: `1px solid ${C.stone}`, borderRadius: "3px",
+                padding: "4px 10px", fontFamily: F.mono, fontSize: "9px",
+                color: C.iron, cursor: "pointer",
+                transition: "all 0.2s ease",
+                letterSpacing: "0.02em",
+              }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = C.amber; e.currentTarget.style.color = C.fog; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = C.stone; e.currentTarget.style.color = C.iron; }}
+              >{hint}</button>
             ))}
           </div>
         )}
@@ -616,21 +654,31 @@ function NavItem({ icon, label, active, collapsed, onClick, isMobile }) {
         width: "100%",
         padding: collapsed ? "9px 0" : isMobile ? "14px 20px" : "9px 14px",
         justifyContent: collapsed ? "center" : "flex-start",
-        background: active ? C.amberSubtle : "transparent",
+        background: active ? `linear-gradient(90deg, ${C.amberSubtle}, transparent)` : "transparent",
         border: "none",
         borderLeft: `2px solid ${active ? C.amber : "transparent"}`,
         cursor: "pointer", borderRadius: 0,
         minHeight: isMobile ? "48px" : undefined,
-        transition: "all 0.2s ease",
+        transition: "all 0.25s cubic-bezier(0.22,1,0.36,1)",
+        position: "relative",
       }}>
+      {active && <div style={{
+        position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)",
+        width: "2px", height: "60%",
+        boxShadow: `0 0 8px 2px rgba(123,143,163,0.3)`,
+        pointerEvents: "none",
+      }} />}
       <div style={{
         width: isMobile ? "22px" : "18px", height: isMobile ? "22px" : "18px", flexShrink: 0,
-        color: lit ? C.amber : C.iron, transition: "color 0.2s ease",
+        color: lit ? C.amber : C.iron,
+        transition: "color 0.25s ease, filter 0.25s ease",
+        filter: active ? "drop-shadow(0 0 4px rgba(123,143,163,0.3))" : "none",
       }}>{icon}</div>
       {!collapsed && (
         <span style={{
           fontFamily: F.sans, fontSize: isMobile ? "15px" : "13px", fontWeight: active ? 600 : 400,
-          color: lit ? C.parchment : C.fog, transition: "color 0.2s ease", whiteSpace: "nowrap",
+          color: lit ? C.parchment : C.fog, transition: "color 0.25s ease", whiteSpace: "nowrap",
+          letterSpacing: active ? "0.01em" : "0",
         }}>{label}</span>
       )}
     </button>
@@ -1039,50 +1087,172 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
   return (
     <div style={{ animation: "fadeUp 0.4s ease both" }}>
 
-      {/* AI Briefing */}
-      <div style={{ marginBottom: "32px" }}>
-        <div style={{
-          display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px",
-        }}>
-          <div style={{
-            fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.08em",
-            textTransform: "uppercase", color: C.amber,
-          }}>Daily Briefing</div>
-          <button onClick={() => fetchBrief(true)} disabled={briefLoading} style={{
-            background: "none", border: `1px solid ${C.slate}`, borderRadius: "3px",
-            padding: isMobile ? "6px 12px" : "2px 8px",
-            fontFamily: F.mono, fontSize: "10px", color: C.amber,
-            cursor: "pointer", minHeight: isMobile ? "32px" : undefined,
-            opacity: briefLoading ? 0.5 : 1,
-          }}>{briefLoading ? "generating..." : brief ? "regenerate" : "generate"}</button>
-        </div>
-
+      {/* AI Briefing — hero composition */}
+      <div style={{ marginBottom: "36px" }}>
         {brief?.content ? (
           <div style={{
-            backgroundColor: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
-            padding: isMobile ? "18px 16px" : "22px 24px",
+            position: "relative", overflow: "hidden",
+            borderRadius: "8px",
+            background: `linear-gradient(135deg, ${C.cavern} 0%, ${C.abyss} 60%, ${C.void} 100%)`,
+            border: `1px solid ${C.stone}`,
+            animation: "fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) both",
           }}>
+            {/* Ambient glow behind card */}
             <div style={{
-              fontFamily: F.body, fontSize: "14px", color: C.fog, lineHeight: 1.75,
-              whiteSpace: "pre-wrap",
-            }}>{brief.content}</div>
+              position: "absolute", top: "-40px", right: "-40px",
+              width: "200px", height: "200px", borderRadius: "50%",
+              background: `radial-gradient(circle, ${C.amberGlow} 0%, transparent 70%)`,
+              animation: "ambientShift 15s ease-in-out infinite",
+              pointerEvents: "none",
+            }} />
+
+            {/* Left accent bar */}
+            <div style={{
+              position: "absolute", left: 0, top: 0, bottom: 0, width: "3px",
+              background: `linear-gradient(180deg, ${C.amber}, ${C.embers}40, transparent)`,
+              backgroundSize: "100% 200%",
+              animation: "borderFlow 6s ease infinite",
+            }} />
+
+            {/* Header row */}
+            <div style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: isMobile ? "18px 20px 0 20px" : "24px 28px 0 28px",
+            }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
+                <span style={{
+                  fontFamily: F.display, fontSize: isMobile ? "14px" : "15px",
+                  color: C.amber, fontStyle: "italic", fontWeight: 300,
+                }}>Briefing</span>
+                <span style={{
+                  fontFamily: F.mono, fontSize: "9px", color: C.slate,
+                  letterSpacing: "0.06em",
+                }}>{brief.brief_date}</span>
+              </div>
+              <button onClick={() => fetchBrief(true)} disabled={briefLoading} style={{
+                background: "none", border: "none", cursor: "pointer",
+                fontFamily: F.mono, fontSize: "9px", color: C.iron,
+                letterSpacing: "0.04em", opacity: briefLoading ? 0.4 : 0.7,
+                transition: "opacity 0.2s",
+              }}
+                onMouseEnter={e => e.currentTarget.style.opacity = "1"}
+                onMouseLeave={e => e.currentTarget.style.opacity = "0.7"}
+              >{briefLoading ? "generating..." : "regenerate"}</button>
+            </div>
+
+            {/* Content — typographic composition */}
+            <div style={{
+              padding: isMobile ? "16px 20px 20px" : "20px 28px 28px",
+              position: "relative", zIndex: 1,
+            }}>
+              {brief.content.split("\n").filter(l => l.trim()).map((line, i) => {
+                const trimmed = line.trim();
+                // First line = status headline
+                if (i === 0) return (
+                  <div key={i} style={{
+                    fontFamily: F.display, fontSize: isMobile ? "22px" : "28px",
+                    fontWeight: 300, color: C.cream, lineHeight: 1.3,
+                    marginBottom: "20px", maxWidth: "560px",
+                    animation: `typeReveal 0.4s ease ${0.1 * (i + 1)}s both`,
+                  }}>{trimmed}</div>
+                );
+                // Bullet points
+                if (trimmed.startsWith("-") || trimmed.startsWith("*")) {
+                  const text = trimmed.replace(/^[-*]\s*/, "");
+                  return (
+                    <div key={i} style={{
+                      display: "flex", gap: "12px", alignItems: "flex-start",
+                      padding: "8px 0",
+                      animation: `typeReveal 0.4s ease ${0.08 * (i + 1)}s both`,
+                    }}>
+                      <div style={{
+                        width: "4px", height: "4px", borderRadius: "50%",
+                        backgroundColor: C.amber, marginTop: "8px", flexShrink: 0,
+                        animation: "glowPulse 3s ease infinite",
+                        animationDelay: `${i * 0.5}s`,
+                      }} />
+                      <span style={{
+                        fontFamily: F.body, fontSize: isMobile ? "13px" : "14px",
+                        color: C.fog, lineHeight: 1.7, fontWeight: 300,
+                      }}>{text}</span>
+                    </div>
+                  );
+                }
+                // Section headers (bold-looking lines)
+                if (trimmed.endsWith(":") || trimmed.toUpperCase() === trimmed && trimmed.length < 40) return (
+                  <div key={i} style={{
+                    fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.12em",
+                    textTransform: "uppercase", color: C.amber, marginTop: "18px", marginBottom: "6px",
+                    animation: `typeReveal 0.4s ease ${0.08 * (i + 1)}s both`,
+                  }}>{trimmed}</div>
+                );
+                // Regular lines
+                return (
+                  <div key={i} style={{
+                    fontFamily: F.body, fontSize: isMobile ? "13px" : "14px",
+                    color: C.fog, lineHeight: 1.7, fontWeight: 300,
+                    padding: "3px 0",
+                    animation: `typeReveal 0.4s ease ${0.08 * (i + 1)}s both`,
+                  }}>{trimmed}</div>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
             {brief.tokens_used && (
               <div style={{
-                fontFamily: F.mono, fontSize: "9px", color: C.slate, marginTop: "12px",
-                borderTop: `1px solid ${C.stone}`, paddingTop: "8px",
-              }}>{brief.tokens_used} tokens / {brief.brief_date}</div>
+                padding: isMobile ? "0 20px 14px" : "0 28px 18px",
+                display: "flex", alignItems: "center", gap: "8px",
+              }}>
+                <div style={{
+                  width: "4px", height: "4px", borderRadius: "50%",
+                  backgroundColor: C.success, animation: "breathe 3s ease infinite",
+                }} />
+                <span style={{
+                  fontFamily: F.mono, fontSize: "8px", color: C.slate,
+                  letterSpacing: "0.06em",
+                }}>{brief.tokens_used} tokens</span>
+              </div>
             )}
           </div>
-        ) : !briefLoading ? (
+        ) : (
           <div style={{
-            backgroundColor: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
-            padding: isMobile ? "18px 16px" : "22px 24px", textAlign: "center",
+            borderRadius: "8px", overflow: "hidden",
+            background: `linear-gradient(135deg, ${C.cavern} 0%, ${C.abyss} 100%)`,
+            border: `1px solid ${C.stone}`,
+            padding: isMobile ? "32px 24px" : "48px 40px",
+            textAlign: "center", position: "relative",
           }}>
-            <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.iron, lineHeight: 1.6 }}>
-              Connect Anthropic in Integrations, then tap generate for your AI briefing.
+            <div style={{
+              position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+              width: "300px", height: "300px", borderRadius: "50%",
+              background: `radial-gradient(circle, ${C.dusk} 0%, transparent 70%)`,
+              animation: "ambientShift 12s ease-in-out infinite",
+              pointerEvents: "none",
+            }} />
+            <div style={{
+              fontFamily: F.display, fontSize: isMobile ? "18px" : "22px",
+              color: C.cream, marginBottom: "10px", position: "relative",
+              fontWeight: 300,
+            }}>Your morning brief</div>
+            <div style={{
+              fontFamily: F.body, fontSize: "13px", color: C.iron,
+              lineHeight: 1.6, position: "relative", marginBottom: "20px",
+            }}>
+              {briefLoading ? "Assembling context and generating..." : "Connect Anthropic in Integrations, then generate."}
             </div>
+            {!briefLoading && (
+              <button onClick={() => fetchBrief(true)} style={{
+                background: `linear-gradient(135deg, ${C.amber}, ${C.embers})`,
+                border: "none", borderRadius: "4px",
+                padding: isMobile ? "12px 24px" : "8px 20px",
+                fontFamily: F.mono, fontSize: "11px", fontWeight: 500,
+                color: C.obsidian, cursor: "pointer", position: "relative",
+                letterSpacing: "0.04em",
+              }}>generate briefing</button>
+            )}
           </div>
-        ) : null}
+        )}
       </div>
 
       {/* Quick Command */}
@@ -2538,7 +2708,7 @@ export default function BatcaveConsole() {
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.3 // batcave</span>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.4 // batcave</span>
           {auth.session && (
             <button onClick={auth.signOut} style={{
               background: "none", border: "none", cursor: "pointer",
@@ -2563,17 +2733,81 @@ export default function BatcaveConsole() {
         * { box-sizing: border-box; margin: 0; padding: 0; }
         ::selection { background: ${C.amber}; color: ${C.obsidian}; }
         input::placeholder { color: ${C.iron}; }
+
         @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes breathe { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
         @keyframes slideRight { from { transform: translateX(-100%); } to { transform: translateX(0); } }
-        ::-webkit-scrollbar { width: 4px; }
+
+        /* Ambient pulse — the app is alive */
+        @keyframes ambientShift {
+          0%, 100% { opacity: 0.3; transform: scale(1) translate(0, 0); }
+          33% { opacity: 0.5; transform: scale(1.1) translate(2%, -1%); }
+          66% { opacity: 0.35; transform: scale(0.95) translate(-1%, 2%); }
+        }
+        @keyframes glowPulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(123,143,163,0); }
+          50% { box-shadow: 0 0 20px 2px rgba(123,143,163,0.08); }
+        }
+        @keyframes borderFlow {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        @keyframes gentleDrift {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-3px); }
+        }
+        @keyframes typeReveal {
+          from { opacity: 0; transform: translateY(4px); filter: blur(2px); }
+          to { opacity: 1; transform: translateY(0); filter: blur(0); }
+        }
+
+        /* Grain overlay */
+        .batcave-grain::after {
+          content: '';
+          position: fixed;
+          top: -50%;
+          left: -50%;
+          right: -50%;
+          bottom: -50%;
+          width: 200%;
+          height: 200%;
+          background: transparent url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E") repeat;
+          pointer-events: none;
+          z-index: 9999;
+          opacity: 0.6;
+        }
+
+        /* Ambient orb — subtle background glow */
+        .batcave-ambient {
+          position: fixed;
+          width: 600px;
+          height: 600px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(123,143,163,0.04) 0%, transparent 70%);
+          animation: ambientShift 20s ease-in-out infinite;
+          pointer-events: none;
+          z-index: 0;
+        }
+
+        ::-webkit-scrollbar { width: 3px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: ${C.slate}; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: ${C.iron}; }
         button { font-family: inherit; }
         html { -webkit-text-size-adjust: 100%; }
+
+        /* Refined focus states */
+        input:focus { border-color: ${C.amber} !important; }
+        select:focus { border-color: ${C.amber} !important; }
       `}</style>
+
+      {/* Ambient background orbs */}
+      <div className="batcave-ambient" style={{ top: "-200px", right: "-200px" }} />
+      <div className="batcave-ambient" style={{ bottom: "-300px", left: "-100px", animationDelay: "-7s", width: "400px", height: "400px" }} />
+      <div className="batcave-grain" />
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
 
@@ -2657,13 +2891,27 @@ export default function BatcaveConsole() {
             transition: "width 0.25s cubic-bezier(0.22,1,0.36,1)",
             flexShrink: 0, overflow: "hidden",
             animation: mounted ? "fadeIn 0.4s ease" : "none",
+            position: "relative",
           }}>
+            {/* Sidebar ambient */}
+            <div style={{
+              position: "absolute", top: "-20px", left: "-20px",
+              width: "120px", height: "120px", borderRadius: "50%",
+              background: `radial-gradient(circle, ${C.amberGlow} 0%, transparent 70%)`,
+              animation: "ambientShift 18s ease-in-out infinite",
+              pointerEvents: "none", zIndex: 0,
+            }} />
             <div onClick={() => setCollapsed(!collapsed)} style={{
-              padding: collapsed ? "18px 14px" : "18px 16px",
+              padding: collapsed ? "18px 14px" : "20px 16px",
               cursor: "pointer", display: "flex", alignItems: "center", gap: "10px",
               borderBottom: `1px solid ${C.stone}`,
+              position: "relative", zIndex: 1,
             }}>
-              <div style={{ width: "28px", height: "28px", color: C.amber, flexShrink: 0 }}>{I.bat}</div>
+              <div style={{
+                width: "28px", height: "28px", color: C.amber, flexShrink: 0,
+                animation: "gentleDrift 6s ease-in-out infinite",
+                filter: "drop-shadow(0 0 8px rgba(123,143,163,0.2))",
+              }}>{I.bat}</div>
               {!collapsed && (
                 <span style={{ fontFamily: F.display, fontSize: "19px", color: C.cream, whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>Batcave</span>
               )}
@@ -2674,26 +2922,36 @@ export default function BatcaveConsole() {
 
         {/* ── MAIN CONTENT ── */}
         <main style={{
-          flex: 1, overflow: "auto",
+          flex: 1, overflow: "auto", position: "relative", zIndex: 1,
           padding: isMobile ? "72px 20px 32px" : "40px 48px",
         }}>
-          <div key={activeModule} style={{ marginBottom: isMobile ? "24px" : "32px", animation: "fadeUp 0.35s ease both" }}>
+          {/* Module header */}
+          <div key={activeModule} style={{ marginBottom: isMobile ? "24px" : "40px", animation: "fadeUp 0.4s cubic-bezier(0.22,1,0.36,1) both" }}>
             <div style={{
-              fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.1em",
-              textTransform: "uppercase", color: C.amber, marginBottom: "8px",
+              fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.16em",
+              textTransform: "uppercase", color: C.amber, marginBottom: "10px",
+              animation: "typeReveal 0.5s ease 0.1s both",
             }}>{meta.mono}</div>
             {!isMobile && (
               <h1 style={{
-                fontFamily: F.display, fontSize: "38px", fontWeight: 300,
-                color: C.cream, lineHeight: 1.1, marginBottom: "6px", letterSpacing: "-0.01em",
+                fontFamily: F.display, fontSize: "46px", fontWeight: 300,
+                color: C.cream, lineHeight: 1.05, marginBottom: "8px", letterSpacing: "-0.02em",
+                animation: "typeReveal 0.5s ease 0.15s both",
               }}>{meta.title}</h1>
             )}
-            <p style={{ fontFamily: F.body, fontSize: isMobile ? "14px" : "15px", fontWeight: 300, color: C.iron }}>{meta.subtitle}</p>
+            <p style={{
+              fontFamily: F.body, fontSize: isMobile ? "14px" : "15px", fontWeight: 300,
+              color: C.iron, fontStyle: "italic",
+              animation: "typeReveal 0.5s ease 0.2s both",
+            }}>{meta.subtitle}</p>
           </div>
 
+          {/* Divider — animated gradient line */}
           <div style={{
-            height: "1px", marginBottom: isMobile ? "20px" : "28px",
-            background: `linear-gradient(to right, ${C.amber}40, ${C.stone}, transparent)`,
+            height: "1px", marginBottom: isMobile ? "24px" : "32px",
+            background: `linear-gradient(90deg, ${C.amber}60, ${C.amber}20, transparent 80%)`,
+            backgroundSize: "200% 100%",
+            animation: "borderFlow 8s ease infinite",
           }} />
 
           <div key={activeModule + "-content"}>
