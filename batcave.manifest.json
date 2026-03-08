@@ -1,0 +1,114 @@
+{
+  "name": "batcave",
+  "version": "2.0.0",
+  "description": "Central nervous system — unified monorepo for all projects, POCs, and ideas",
+  "owner": "anthonyschroeck-wq",
+  "managed_via": "messaging",
+  "design_system": {
+    "fonts": {
+      "display": "Instrument Serif",
+      "body": "Source Sans 3",
+      "mono": "IBM Plex Mono"
+    },
+    "palette": {
+      "navy": "#0a1628",
+      "white": "#ffffff",
+      "black": "#000000",
+      "cream": "#f5f0e8"
+    },
+    "icons": "svg-linework",
+    "stroke": {
+      "primary": "1.4px",
+      "texture_offset": "0.5px",
+      "texture_opacity": "25-30%",
+      "caps": "round",
+      "joins": "round"
+    }
+  },
+  "projects": [
+    {
+      "slug": "console",
+      "name": "Batcave Console",
+      "status": "active",
+      "type": "app",
+      "stack": ["react", "vite"],
+      "deploy": {
+        "platform": "vercel",
+        "url": "https://batcave-console.vercel.app"
+      },
+      "repo_origin": "anthonyschroeck-wq/batcave",
+      "migrated": true,
+      "notes": "Unified command console — the dashboard UI for the Batcave itself"
+    },
+    {
+      "slug": "fox-market",
+      "name": "Fox Market",
+      "status": "active",
+      "type": "app",
+      "stack": ["react", "vite", "claude-api"],
+      "deploy": {
+        "platform": "vercel",
+        "url": null
+      },
+      "repo_origin": "anthonyschroeck-wq/fox-market",
+      "migrated": false,
+      "notes": "AI-powered trading simulator with Monte Carlo forecasting and Ask Fox chat"
+    },
+    {
+      "slug": "run-recipes",
+      "name": "Run Recipes",
+      "status": "active",
+      "type": "app",
+      "stack": ["react", "vite"],
+      "deploy": {
+        "platform": "vercel",
+        "url": null
+      },
+      "repo_origin": "anthonyschroeck-wq/run-recipes",
+      "migrated": false,
+      "notes": "Meal management app with sidebar nav and Yes Chef scoring system"
+    },
+    {
+      "slug": "omote",
+      "name": "Omote Demo Platform",
+      "status": "active",
+      "type": "app",
+      "stack": ["react", "vite", "okta", "claude-api"],
+      "deploy": {
+        "platform": "vercel",
+        "url": null
+      },
+      "repo_origin": null,
+      "migrated": false,
+      "notes": "Single-instance demo platform with sequential pre-demo flow, config manifest, AI insights layer (Analytics/Decide/Predict)"
+    },
+    {
+      "slug": "veritas",
+      "name": "Veritas",
+      "status": "incubating",
+      "type": "extension",
+      "stack": ["chrome-extension", "manifest-v3"],
+      "deploy": {
+        "platform": "chrome-web-store",
+        "url": null
+      },
+      "repo_origin": null,
+      "migrated": false,
+      "notes": "Chrome extension for AI content detection — heuristic analysis and contradiction detection"
+    },
+    {
+      "slug": "syndio-mockups",
+      "name": "Syndio Mockups",
+      "status": "active",
+      "type": "poc",
+      "stack": ["react", "vite"],
+      "deploy": {
+        "platform": "vercel",
+        "url": null
+      },
+      "repo_origin": null,
+      "migrated": false,
+      "notes": "Multi-POC workspace for pay equity and HR tech mockups"
+    }
+  ]
+}
