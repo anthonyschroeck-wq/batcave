@@ -1691,6 +1691,333 @@ function ChatShell({ isMobile, session, liveData }) {
   );
 }
 
+// ─── Calendar Module ─────────────────────────────────────────────
+function CalendarModule({ isMobile, session }) {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [viewDate, setViewDate] = useState(new Date());
+  const [showAdd, setShowAdd] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newStart, setNewStart] = useState("");
+  const [newEnd, setNewEnd] = useState("");
+  const [newCategory, setNewCategory] = useState("personal");
+  const [newLocation, setNewLocation] = useState("");
+
+  const headers = session?.access_token
+    ? { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }
+    : { "Content-Type": "application/json" };
+
+  const fetchEvents = useCallback(async () => {
+    setLoading(true);
+    try {
+      const y = viewDate.getFullYear();
+      const m = viewDate.getMonth();
+      const from = new Date(y, m - 1, 1).toISOString().slice(0, 10);
+      const to = new Date(y, m + 2, 0).toISOString().slice(0, 10);
+      const res = await fetch(`/api/events?from=${from}&to=${to}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setEvents(data.events || []);
+      }
+    } catch {}
+    setLoading(false);
+  }, [session, viewDate]);
+
+  useEffect(() => { fetchEvents(); }, [fetchEvents]);
+
+  const addEvent = async () => {
+    if (!newTitle.trim() || !newStart) return;
+    try {
+      await fetch("/api/events", {
+        method: "POST", headers,
+        body: JSON.stringify({
+          title: newTitle.trim(), start_date: newStart,
+          end_date: newEnd || newStart, category: newCategory,
+          location: newLocation || null,
+        }),
+      });
+      setNewTitle(""); setNewStart(""); setNewEnd(""); setNewLocation(""); setShowAdd(false);
+      fetchEvents();
+    } catch {}
+  };
+
+  const deleteEvent = async (id) => {
+    try {
+      await fetch("/api/events", { method: "DELETE", headers, body: JSON.stringify({ id }) });
+      fetchEvents();
+    } catch {}
+  };
+
+  // Calendar math
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const dayLabels = isMobile ? ["S","M","T","W","T","F","S"] : ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // Build grid cells
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const categoryColors = {
+    personal: C.amber, professional: "#6A8FA3", travel: "#8A6FA3",
+    health: C.success, project: "#A38A6F",
+  };
+  const categoryLabels = {
+    personal: "Personal", professional: "Work", travel: "Travel",
+    health: "Health", project: "Project",
+  };
+
+  // Check if event spans a given date
+  const getEventsForDate = (dateStr) => {
+    return events.filter(ev => {
+      const s = ev.start_date;
+      const e = ev.end_date || ev.start_date;
+      return dateStr >= s && dateStr <= e;
+    });
+  };
+
+  const prevMonth = () => setViewDate(new Date(year, month - 1, 1));
+  const nextMonth = () => setViewDate(new Date(year, month + 1, 1));
+  const goToday = () => setViewDate(new Date());
+
+  const inputStyle = {
+    background: C.obsidian, border: `1px solid ${C.slate}`, borderRadius: "4px",
+    padding: isMobile ? "12px" : "8px 12px",
+    fontFamily: F.sans, fontSize: isMobile ? "16px" : "13px",
+    color: C.parchment, outline: "none", width: "100%",
+  };
+
+  return (
+    <div style={{ animation: "fadeUp 0.4s ease both" }}>
+      {/* Month nav */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px",
+      }}>
+        <button onClick={prevMonth} style={{
+          background: "none", border: `1px solid ${C.slate}`, borderRadius: "4px",
+          padding: isMobile ? "8px 12px" : "4px 10px", cursor: "pointer",
+          fontFamily: F.mono, fontSize: "12px", color: C.fog,
+          minHeight: isMobile ? "40px" : undefined,
+        }}>prev</button>
+        <div style={{ flex: 1, textAlign: "center" }}>
+          <span style={{ fontFamily: F.display, fontSize: isMobile ? "22px" : "24px", color: C.cream }}>
+            {monthNames[month]}
+          </span>
+          <span style={{ fontFamily: F.mono, fontSize: "12px", color: C.iron, marginLeft: "8px" }}>{year}</span>
+        </div>
+        <button onClick={goToday} style={{
+          background: "none", border: `1px solid ${C.slate}`, borderRadius: "4px",
+          padding: isMobile ? "8px 12px" : "4px 10px", cursor: "pointer",
+          fontFamily: F.mono, fontSize: "11px", color: C.amber,
+          minHeight: isMobile ? "40px" : undefined,
+        }}>today</button>
+        <button onClick={nextMonth} style={{
+          background: "none", border: `1px solid ${C.slate}`, borderRadius: "4px",
+          padding: isMobile ? "8px 12px" : "4px 10px", cursor: "pointer",
+          fontFamily: F.mono, fontSize: "12px", color: C.fog,
+          minHeight: isMobile ? "40px" : undefined,
+        }}>next</button>
+      </div>
+
+      {/* Add event button */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          {Object.entries(categoryLabels).map(([k, v]) => (
+            <span key={k} style={{
+              display: "inline-flex", alignItems: "center", gap: "4px",
+              fontFamily: F.mono, fontSize: "9px", color: C.iron,
+            }}>
+              <span style={{ width: "6px", height: "6px", borderRadius: "2px", backgroundColor: categoryColors[k] }} />
+              {v}
+            </span>
+          ))}
+        </div>
+        <button onClick={() => setShowAdd(!showAdd)} style={{
+          background: showAdd ? C.stone : C.amber, border: "none", borderRadius: "4px",
+          padding: isMobile ? "8px 14px" : "5px 12px",
+          fontFamily: F.mono, fontSize: "11px", color: showAdd ? C.iron : C.obsidian,
+          cursor: "pointer", fontWeight: 600, minHeight: isMobile ? "40px" : undefined,
+        }}>{showAdd ? "cancel" : "+ event"}</button>
+      </div>
+
+      {/* Add event form */}
+      {showAdd && (
+        <div style={{
+          backgroundColor: C.cavern, border: `1px solid ${C.amber}`, borderRadius: "6px",
+          padding: isMobile ? "16px" : "16px 20px", marginBottom: "16px",
+          animation: "fadeUp 0.2s ease both",
+        }}>
+          <input value={newTitle} onChange={e => setNewTitle(e.target.value)}
+            placeholder="Event title..." style={{ ...inputStyle, marginBottom: "10px" }}
+            onKeyDown={e => e.key === "Enter" && addEvent()}
+          />
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "10px" }}>
+            <div style={{ flex: 1, minWidth: "120px" }}>
+              <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, marginBottom: "4px" }}>Start</div>
+              <input type="date" value={newStart} onChange={e => setNewStart(e.target.value)} style={inputStyle} />
+            </div>
+            <div style={{ flex: 1, minWidth: "120px" }}>
+              <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, marginBottom: "4px" }}>End</div>
+              <input type="date" value={newEnd} onChange={e => setNewEnd(e.target.value)} style={inputStyle} />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <select value={newCategory} onChange={e => setNewCategory(e.target.value)} style={{ ...inputStyle, width: "auto" }}>
+              {Object.entries(categoryLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+            <input value={newLocation} onChange={e => setNewLocation(e.target.value)}
+              placeholder="Location (optional)" style={{ ...inputStyle, flex: 1 }}
+            />
+            <button onClick={addEvent} style={{
+              background: C.amber, border: "none", borderRadius: "4px",
+              padding: isMobile ? "10px 16px" : "8px 14px",
+              fontFamily: F.mono, fontSize: "12px", fontWeight: 600,
+              color: C.obsidian, cursor: "pointer",
+            }}>add</button>
+          </div>
+        </div>
+      )}
+
+      {/* Calendar grid */}
+      <div style={{
+        backgroundColor: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
+        overflow: "hidden",
+      }}>
+        {/* Day headers */}
+        <div style={{
+          display: "grid", gridTemplateColumns: "repeat(7, 1fr)",
+          borderBottom: `1px solid ${C.stone}`,
+        }}>
+          {dayLabels.map(d => (
+            <div key={d} style={{
+              padding: "8px 0", textAlign: "center",
+              fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.06em",
+              color: C.iron, textTransform: "uppercase",
+            }}>{d}</div>
+          ))}
+        </div>
+
+        {/* Day cells */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
+          {cells.map((day, i) => {
+            if (day === null) return <div key={`empty-${i}`} style={{ minHeight: isMobile ? "60px" : "80px", backgroundColor: C.obsidian, borderBottom: `1px solid ${C.stone}`, borderRight: `1px solid ${C.stone}` }} />;
+
+            const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+            const isToday = dateStr === todayStr;
+            const dayEvents = getEventsForDate(dateStr);
+
+            return (
+              <div key={dateStr} style={{
+                minHeight: isMobile ? "60px" : "80px",
+                padding: isMobile ? "4px" : "4px 6px",
+                borderBottom: `1px solid ${C.stone}`,
+                borderRight: `1px solid ${C.stone}`,
+                backgroundColor: isToday ? C.amberSubtle : "transparent",
+                overflow: "hidden",
+              }}>
+                {/* Day number */}
+                <div style={{
+                  fontFamily: F.mono, fontSize: isMobile ? "11px" : "12px",
+                  color: isToday ? C.amber : C.fog,
+                  fontWeight: isToday ? 600 : 400,
+                  marginBottom: "2px",
+                }}>{day}</div>
+
+                {/* Events */}
+                {dayEvents.slice(0, isMobile ? 2 : 3).map(ev => {
+                  const isStart = ev.start_date === dateStr;
+                  const evColor = categoryColors[ev.category] || C.amber;
+                  return (
+                    <div key={ev.id} onClick={() => { if (confirm(`Delete "${ev.title}"?`)) deleteEvent(ev.id); }}
+                      style={{
+                        fontFamily: F.sans, fontSize: isMobile ? "9px" : "10px",
+                        color: C.cream, padding: "1px 4px", marginBottom: "1px",
+                        borderRadius: isStart ? "3px 0 0 3px" : "0",
+                        backgroundColor: `${evColor}40`,
+                        borderLeft: isStart ? `2px solid ${evColor}` : "none",
+                        cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      }}
+                      title={`${ev.title}${ev.location ? " — " + ev.location : ""}`}
+                    >
+                      {isStart ? ev.title : ""}
+                    </div>
+                  );
+                })}
+                {dayEvents.length > (isMobile ? 2 : 3) && (
+                  <div style={{ fontFamily: F.mono, fontSize: "8px", color: C.iron }}>
+                    +{dayEvents.length - (isMobile ? 2 : 3)} more
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Upcoming events list */}
+      <div style={{ marginTop: "24px" }}>
+        <div style={{
+          fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.08em",
+          textTransform: "uppercase", color: C.amber, marginBottom: "12px",
+        }}>Upcoming</div>
+
+        {loading && <div style={{ fontFamily: F.mono, fontSize: "12px", color: C.iron }}>Loading events...</div>}
+
+        {events.filter(e => e.end_date >= todayStr || e.start_date >= todayStr).slice(0, 10).map((ev, i) => (
+          <div key={ev.id} style={{
+            display: "flex", alignItems: "center", gap: "12px",
+            padding: isMobile ? "12px 0" : "10px 0",
+            borderBottom: `1px solid ${C.stone}`,
+            animation: `fadeUp 0.25s ease ${0.03 * i}s both`,
+          }}>
+            {/* Category dot */}
+            <div style={{
+              width: "8px", height: "8px", borderRadius: "2px", flexShrink: 0,
+              backgroundColor: categoryColors[ev.category] || C.amber,
+            }} />
+
+            {/* Details */}
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: F.sans, fontSize: isMobile ? "14px" : "13px", color: C.parchment }}>{ev.title}</div>
+              <div style={{ fontFamily: F.mono, fontSize: "10px", color: C.iron, marginTop: "2px" }}>
+                {ev.start_date}{ev.end_date && ev.end_date !== ev.start_date ? ` — ${ev.end_date}` : ""}
+                {ev.location && <span style={{ marginLeft: "8px", color: C.fog }}>{ev.location}</span>}
+              </div>
+            </div>
+
+            {/* Category label */}
+            <span style={{
+              fontFamily: F.mono, fontSize: "8px", letterSpacing: "0.06em",
+              textTransform: "uppercase", padding: "2px 6px", borderRadius: "3px",
+              color: categoryColors[ev.category] || C.amber,
+              backgroundColor: `${categoryColors[ev.category] || C.amber}10`,
+              border: `1px solid ${categoryColors[ev.category] || C.amber}30`,
+            }}>{categoryLabels[ev.category] || ev.category}</span>
+
+            {/* Delete */}
+            <button onClick={() => deleteEvent(ev.id)} style={{
+              background: "none", border: "none", cursor: "pointer",
+              color: C.slate, fontSize: "14px", padding: "4px",
+              minWidth: isMobile ? "32px" : undefined, minHeight: isMobile ? "32px" : undefined,
+            }}>x</button>
+          </div>
+        ))}
+
+        {!loading && events.length === 0 && (
+          <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.iron }}>
+            No events yet. Add one above or use #batcave_calendar in chat.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Placeholder Module ──────────────────────────────────────────
 function PlaceholderModule({ description, items, isMobile }) {
   return (
@@ -1790,7 +2117,7 @@ export default function BatcaveConsole() {
     projects: { title: "Projects", mono: "System Registry", subtitle: `${manifest.projects.length} registered across the system` },
     agents: { title: "Agents", mono: "Autonomous Systems", subtitle: "Build and manage autonomous workflows" },
     fitness: { title: "Fitness", mono: "Performance", subtitle: "Workouts, nutrition, recovery tracking" },
-    calendar: { title: "Calendar", mono: "Scheduling", subtitle: "Unified calendar and email view" },
+    calendar: { title: "Calendar", mono: "Schedule", subtitle: "Personal, professional, and travel — one view" },
     integrations: { title: "Integrations", mono: "Admin", subtitle: "Manage service connections" },
   };
 
@@ -1811,15 +2138,6 @@ export default function BatcaveConsole() {
         { label: "Nutrition", title: "Fuel Tracker", desc: "Meals, macros, hydration" },
         { label: "Recovery", title: "Recovery Score", desc: "Sleep, soreness, readiness" },
         { label: "Trends", title: "Progress", desc: "Weekly and monthly trends" },
-      ],
-    },
-    calendar: {
-      description: "Unified view of calendar events and email threads. Connected via Google Calendar and Gmail. Your morning brief, automated.",
-      items: [
-        { label: "Today", title: "Daily Agenda", desc: "Meetings, blocks, open time" },
-        { label: "Email", title: "Priority Inbox", desc: "Flagged threads, pending replies" },
-        { label: "Week", title: "Week View", desc: "Availability and scheduling" },
-        { label: "Digest", title: "Morning Brief", desc: "AI summary of upcoming day" },
       ],
     },
   };
@@ -1869,7 +2187,7 @@ export default function BatcaveConsole() {
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.0 // batcave</span>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.1 // batcave</span>
           {auth.session && (
             <button onClick={auth.signOut} style={{
               background: "none", border: "none", cursor: "pointer",
@@ -2031,9 +2349,10 @@ export default function BatcaveConsole() {
             {activeModule === "home" && <HomepageModule isMobile={isMobile} />}
             {activeModule === "command" && <ChatShell isMobile={isMobile} session={auth.session} liveData={liveData} />}
             {activeModule === "tasks" && <TasksModule isMobile={isMobile} session={auth.session} />}
+            {activeModule === "calendar" && <CalendarModule isMobile={isMobile} session={auth.session} />}
             {activeModule === "projects" && <ProjectsModule isMobile={isMobile} liveData={liveData} />}
             {activeModule === "integrations" && <IntegrationsModule isMobile={isMobile} liveData={liveData} session={auth.session} />}
-            {!["home","command","tasks","projects","integrations"].includes(activeModule) && placeholders[activeModule] && (
+            {!["home","command","tasks","calendar","projects","integrations"].includes(activeModule) && placeholders[activeModule] && (
               <PlaceholderModule description={placeholders[activeModule].description} items={placeholders[activeModule].items} isMobile={isMobile} />
             )}
           </div>
