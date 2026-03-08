@@ -1,10 +1,27 @@
-export default function handler(req, res) {
+import { getServiceClient } from "./_supabase.js";
+
+export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
-  res.json({
-    github: { connected: !!process.env.GH_TOKEN, label: "GitHub" },
-    vercel: { connected: !!process.env.VERCEL_API_TOKEN, label: "Vercel" },
-    finnhub: { connected: !!process.env.FINNHUB_API_KEY, label: "Finnhub" },
-    gmail: { connected: !!process.env.GMAIL_TOKEN, label: "Gmail" },
-    gcal: { connected: !!process.env.GCAL_TOKEN, label: "Google Calendar" },
-  });
+
+  const services = {
+    github: { connected: false, label: "GitHub" },
+    finnhub: { connected: false, label: "Finnhub" },
+    gmail: { connected: false, label: "Gmail" },
+    gcal: { connected: false, label: "Google Calendar" },
+  };
+
+  const supabase = getServiceClient();
+  if (supabase) {
+    const { data } = await supabase.from("batcave_secrets").select("service_id");
+    if (data) {
+      for (const row of data) {
+        if (services[row.service_id]) services[row.service_id].connected = true;
+      }
+    }
+    services.supabase = { connected: true, label: "Supabase" };
+  } else {
+    services.supabase = { connected: false, label: "Supabase" };
+  }
+
+  res.json(services);
 }

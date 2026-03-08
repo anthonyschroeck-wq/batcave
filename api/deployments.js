@@ -7,13 +7,11 @@ export default async function handler(req, res) {
 
   try {
     const url = `https://api.vercel.com/v6/deployments?projectId=${projectId}&teamId=${teamId}&limit=${limit}`;
-    const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     const data = await response.json();
     res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=60");
     res.status(response.status).json(data);
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Vercel API request failed" });
   }
 }
