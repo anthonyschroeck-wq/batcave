@@ -45,14 +45,59 @@ function useMobile(breakpoint = 768) {
   return isMobile;
 }
 
-// ─── Manifest ────────────────────────────────────────────────────
+// ─── Manifest (enriched with git + vercel data) ─────────────────
 const manifest = {
   projects: [
-    { slug: "console", name: "Batcave Console", status: "active", type: "app", migrated: true, deploy: "https://batcave-sage.vercel.app", notes: "Dashboard UI — the Batcave itself" },
-    { slug: "omote", name: "Omote", status: "active", type: "app", migrated: false, deploy: "https://omote-one.vercel.app", notes: "Demo stage designer — Supabase backend, JSX sandboxing, multi-cue system" },
-    { slug: "cerebro", name: "Cerebro", status: "active", type: "app", migrated: false, deploy: null, notes: "GTM intelligence dashboard — NL queries, sentiment, trend charts" },
-    { slug: "run-recipes", name: "Run Recipes", status: "active", type: "app", migrated: false, deploy: null, notes: "Meal management, sidebar nav, Yes Chef scoring" },
-    { slug: "veritas", name: "Veritas", status: "incubating", type: "extension", migrated: false, deploy: null, notes: "Chrome extension — AI content detection, Manifest V3" },
+    {
+      slug: "console", name: "Batcave Console", status: "active", type: "app", migrated: true,
+      notes: "Dashboard UI — the Batcave itself",
+      repo: "anthonyschroeck-wq/batcave",
+      version: "v2.3",
+      production: { url: "https://batcave-sage.vercel.app", state: "READY" },
+      staging: null,
+      git: { branch: "main", sha: "cbb0c03", message: "feat: mobile-first console v2.3", date: "2026-03-08" },
+      vercel: { inspector: "https://vercel.com/anthonyschroeck-wqs-projects/batcave" },
+      github: "https://github.com/anthonyschroeck-wq/batcave",
+    },
+    {
+      slug: "omote", name: "Omote", status: "active", type: "app", migrated: false,
+      notes: "Demo stage designer — Supabase backend, JSX sandboxing, multi-cue system",
+      repo: "anthonyschroeck-wq/omote",
+      version: "mk8.4",
+      production: { url: "https://omote-one.vercel.app", state: "READY" },
+      staging: { url: "https://omote-one-dev.vercel.app", state: "READY" },
+      git: { branch: "main", sha: "ba9f241", message: "Omote mk8.4 — Merge dev to main", date: "2026-03-08" },
+      vercel: { inspector: "https://vercel.com/anthonyschroeck-wqs-projects/omote" },
+      github: "https://github.com/anthonyschroeck-wq/omote",
+    },
+    {
+      slug: "cerebro", name: "Cerebro", status: "active", type: "app", migrated: false,
+      notes: "GTM intelligence dashboard — NL queries, sentiment, trend charts",
+      repo: "anthonyschroeck-wq/cerebro",
+      version: "mk1.1",
+      production: null,
+      staging: null,
+      git: { branch: "main", sha: "a603815", message: "add three.js types", date: "2026-02-22" },
+      vercel: { inspector: "https://vercel.com/anthonyschroeck-wqs-projects/cerebro" },
+      github: "https://github.com/anthonyschroeck-wq/cerebro",
+    },
+    {
+      slug: "run-recipes", name: "Run Recipes", status: "active", type: "app", migrated: false,
+      notes: "Meal management, sidebar nav, Yes Chef scoring",
+      repo: "anthonyschroeck-wq/run-recipes",
+      version: null,
+      production: null,
+      staging: null,
+      git: { branch: "main", sha: "36e4456", message: "Update App.jsx", date: "2026-02-27" },
+      vercel: { inspector: "https://vercel.com/anthonyschroeck-wqs-projects/run-recipes" },
+      github: "https://github.com/anthonyschroeck-wq/run-recipes",
+    },
+    {
+      slug: "veritas", name: "Veritas", status: "incubating", type: "extension", migrated: false,
+      notes: "Chrome extension — AI content detection, Manifest V3",
+      repo: null, version: null, production: null, staging: null,
+      git: null, vercel: null, github: null,
+    },
   ],
 };
 
@@ -270,76 +315,162 @@ function NavItem({ icon, label, active, collapsed, onClick, isMobile }) {
 }
 
 // ─── Project Row ─────────────────────────────────────────────────
-function ProjectRow({ project, index, isMobile }) {
+// ─── Deploy Badge ────────────────────────────────────────────────
+function DeployBadge({ state }) {
+  const colors = { READY: C.success, BUILDING: C.caution, QUEUED: C.caution, ERROR: C.danger };
+  const labels = { READY: "live", BUILDING: "building", QUEUED: "queued", ERROR: "error" };
+  const c = colors[state] || C.iron;
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: "5px",
+      fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.04em", color: c,
+    }}>
+      <span style={{
+        width: "6px", height: "6px", borderRadius: "50%", backgroundColor: c,
+        animation: state === "READY" ? "breathe 3s ease-in-out infinite" : "none",
+      }} />
+      {labels[state] || state?.toLowerCase()}
+    </span>
+  );
+}
+
+// ─── Link Chip ──────────────────────────────────────────────────
+function LinkChip({ href, label, icon }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" style={{
+      display: "inline-flex", alignItems: "center", gap: "5px",
+      fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.03em",
+      color: C.amber, textDecoration: "none",
+      padding: "3px 8px", borderRadius: "3px",
+      backgroundColor: C.amberSubtle, border: `1px solid ${C.amberGlow}`,
+      minHeight: "28px",
+      transition: "background-color 0.2s ease, border-color 0.2s ease",
+    }}
+      onMouseEnter={e => { e.currentTarget.style.backgroundColor = C.amberGlow; e.currentTarget.style.borderColor = C.amber; }}
+      onMouseLeave={e => { e.currentTarget.style.backgroundColor = C.amberSubtle; e.currentTarget.style.borderColor = C.amberGlow; }}
+    >
+      {icon && <span style={{ width: "12px", height: "12px", display: "flex" }}>{icon}</span>}
+      {label}
+    </a>
+  );
+}
+
+// ─── Project Card ────────────────────────────────────────────────
+function ProjectCard({ project, index, isMobile }) {
   const [expanded, setExpanded] = useState(false);
-  const [hovered, setHovered] = useState(false);
   const sc = statusConfig[project.status];
+  const p = project;
+
+  const mono = (text, color) => (
+    <span style={{ fontFamily: F.mono, fontSize: isMobile ? "11px" : "10px", color: color || C.iron }}>{text}</span>
+  );
 
   return (
-    <div style={{ animation: `fadeUp 0.35s ease ${0.04 * index}s both` }}>
-      <div onClick={() => setExpanded(!expanded)}
-        onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-        style={{
-          display: "flex", alignItems: "center", gap: isMobile ? "10px" : "12px",
-          padding: isMobile ? "16px 0" : "14px 0",
-          borderBottom: `1px solid ${C.stone}`,
-          cursor: "pointer", minHeight: isMobile ? "52px" : undefined,
-        }}>
+    <div style={{
+      backgroundColor: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
+      overflow: "hidden", transition: "border-color 0.3s ease",
+      animation: `fadeUp 0.35s ease ${0.06 * index}s both`,
+    }}
+      onMouseEnter={e => e.currentTarget.style.borderColor = C.slate}
+      onMouseLeave={e => e.currentTarget.style.borderColor = C.stone}
+    >
+      {/* Header row */}
+      <div onClick={() => setExpanded(!expanded)} style={{
+        display: "flex", alignItems: "center", gap: "10px",
+        padding: isMobile ? "16px" : "16px 20px",
+        cursor: "pointer",
+      }}>
         <div style={{
-          width: "7px", height: "7px", borderRadius: "50%",
-          backgroundColor: sc.color, flexShrink: 0,
-          animation: project.status === "active" ? "breathe 3s ease-in-out infinite" : "none",
+          width: "8px", height: "8px", borderRadius: "50%", backgroundColor: sc.color, flexShrink: 0,
+          animation: p.status === "active" ? "breathe 3s ease-in-out infinite" : "none",
         }} />
-        <div style={{
-          fontFamily: F.display, fontSize: isMobile ? "19px" : "18px", flex: 1,
-          color: hovered ? C.cream : C.parchment, transition: "color 0.2s ease",
-        }}>{project.name}</div>
-
-        {/* Type badge - hide on very small screens to save space */}
-        {!isMobile && (
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: F.display, fontSize: isMobile ? "20px" : "19px", color: C.cream }}>{p.name}</div>
+          <div style={{ fontFamily: F.sans, fontSize: "12px", color: C.iron, marginTop: "2px" }}>{p.notes}</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+          {p.version && mono(p.version, C.fog)}
           <span style={{
             fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.06em",
             padding: "2px 8px", border: `1px solid ${C.slate}`, borderRadius: "3px", color: C.iron,
-          }}>{typeLabels[project.type]}</span>
-        )}
-
-        {!project.migrated && !isMobile && (
-          <span style={{ width: "12px", height: "12px", color: C.iron, display: "flex" }}>{I.external}</span>
-        )}
-
-        <span style={{
-          width: "16px", height: "16px", color: hovered ? C.amber : C.iron,
-          transform: expanded ? "rotate(90deg)" : "rotate(0)",
-          transition: "transform 0.2s ease, color 0.2s ease", display: "flex", flexShrink: 0,
-        }}>{I.chevron}</span>
+          }}>{typeLabels[p.type]}</span>
+          <span style={{
+            width: "16px", height: "16px", color: C.iron,
+            transform: expanded ? "rotate(90deg)" : "rotate(0)",
+            transition: "transform 0.2s ease", display: "flex", flexShrink: 0,
+          }}>{I.chevron}</span>
+        </div>
       </div>
 
+      {/* Quick links bar — always visible */}
+      {(p.production || p.staging || p.github) && (
+        <div style={{
+          display: "flex", gap: "8px", flexWrap: "wrap",
+          padding: isMobile ? "0 16px 14px" : "0 20px 14px",
+        }}>
+          {p.production && (
+            <LinkChip href={p.production.url} label="production" icon={I.deploy} />
+          )}
+          {p.staging && (
+            <LinkChip href={p.staging.url} label="staging" icon={I.deploy} />
+          )}
+          {p.github && (
+            <LinkChip href={p.github} label="github" icon={I.external} />
+          )}
+          {p.vercel && (
+            <LinkChip href={p.vercel.inspector} label="vercel" icon={I.layers} />
+          )}
+        </div>
+      )}
+
+      {/* Expanded detail panel */}
       {expanded && (
         <div style={{
-          padding: isMobile ? "14px 0 14px 16px" : "14px 0 14px 19px",
-          borderBottom: `1px solid ${C.stone}`,
-          borderLeft: `2px solid ${C.amber}`, paddingLeft: "16px",
+          borderTop: `1px solid ${C.stone}`,
+          padding: isMobile ? "14px 16px" : "16px 20px",
           animation: "fadeUp 0.2s ease both",
         }}>
-          <div style={{
-            fontFamily: F.body, fontSize: "14px", fontWeight: 300,
-            color: C.fog, lineHeight: 1.6, marginBottom: "12px",
-          }}>{project.notes}</div>
+          {/* Deploy status row */}
+          {(p.production || p.staging) && (
+            <div style={{ display: "flex", gap: isMobile ? "16px" : "32px", marginBottom: "14px", flexWrap: "wrap" }}>
+              {p.production && (
+                <div>
+                  <div style={{ fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.08em", textTransform: "uppercase", color: C.iron, marginBottom: "4px" }}>Production</div>
+                  <DeployBadge state={p.production.state} />
+                </div>
+              )}
+              {p.staging && (
+                <div>
+                  <div style={{ fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.08em", textTransform: "uppercase", color: C.iron, marginBottom: "4px" }}>Staging</div>
+                  <DeployBadge state={p.staging.state} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Git info */}
+          {p.git && (
+            <div style={{
+              backgroundColor: C.obsidian, borderRadius: "4px",
+              padding: isMobile ? "12px" : "12px 14px",
+              fontFamily: F.mono, fontSize: isMobile ? "11px" : "10px",
+              lineHeight: 1.7, color: C.fog,
+            }}>
+              <div><span style={{ color: C.iron }}>branch:</span> <span style={{ color: C.parchment }}>{p.git.branch}</span></div>
+              <div><span style={{ color: C.iron }}>commit:</span> <span style={{ color: C.amber }}>{p.git.sha}</span> <span style={{ color: C.iron }}>{p.git.date}</span></div>
+              <div style={{ color: C.fog, marginTop: "4px" }}>{p.git.message}</div>
+            </div>
+          )}
+
+          {/* Meta row */}
           <div style={{
             display: "flex", gap: isMobile ? "12px" : "20px", flexWrap: "wrap",
-            fontFamily: F.mono, fontSize: isMobile ? "11px" : "10px", color: C.iron,
+            fontFamily: F.mono, fontSize: "10px", color: C.iron, marginTop: "12px",
           }}>
             <span>status: <span style={{ color: sc.color }}>{sc.label.toLowerCase()}</span></span>
-            {isMobile && <span style={{
-              fontFamily: F.mono, fontSize: "10px", padding: "1px 6px",
-              border: `1px solid ${C.slate}`, borderRadius: "3px", color: C.iron,
-            }}>{typeLabels[project.type]}</span>}
-            <span>slug: {project.slug}</span>
-            {project.deploy && (
-              <a href={project.deploy} target="_blank" rel="noopener noreferrer"
-                style={{ color: C.amber, textDecoration: "none" }}>deployed</a>
-            )}
-            {project.migrated && <span style={{ color: C.success }}>in-repo</span>}
+            <span>slug: {p.slug}</span>
+            {p.repo && <span>repo: {p.repo.split("/")[1]}</span>}
+            {p.migrated && <span style={{ color: C.success }}>in-repo</span>}
           </div>
         </div>
       )}
@@ -347,13 +478,14 @@ function ProjectRow({ project, index, isMobile }) {
   );
 }
 
-// ─── Projects Module ─────────────────────────────────────────────
+// ─── Projects Module (Dashboard) ─────────────────────────────────
 function ProjectsModule({ isMobile }) {
   const active = manifest.projects.filter(p => p.status === "active");
-  const incubating = manifest.projects.filter(p => p.status !== "active");
+  const deployed = manifest.projects.filter(p => p.production?.state === "READY");
 
   return (
     <div>
+      {/* Stats */}
       <div style={{
         display: "grid",
         gridTemplateColumns: isMobile ? "repeat(4, 1fr)" : "repeat(4, auto)",
@@ -363,7 +495,7 @@ function ProjectsModule({ isMobile }) {
         {[
           { label: "Total", value: manifest.projects.length },
           { label: "Active", value: active.length },
-          { label: "Incubating", value: incubating.length },
+          { label: "Deployed", value: deployed.length },
           { label: "In-Repo", value: manifest.projects.filter(p => p.migrated).length },
         ].map(stat => (
           <div key={stat.label}>
@@ -372,7 +504,11 @@ function ProjectsModule({ isMobile }) {
           </div>
         ))}
       </div>
-      {manifest.projects.map((p, i) => <ProjectRow key={p.slug} project={p} index={i} isMobile={isMobile} />)}
+
+      {/* Project cards */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+        {manifest.projects.map((p, i) => <ProjectCard key={p.slug} project={p} index={i} isMobile={isMobile} />)}
+      </div>
     </div>
   );
 }
@@ -547,7 +683,7 @@ export default function BatcaveConsole() {
         <div style={{
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em",
-        }}>v2.3 // batcave</div>
+        }}>v2.4 // batcave</div>
       )}
     </>
   );
