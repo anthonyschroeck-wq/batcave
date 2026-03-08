@@ -1,8 +1,51 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createClient } from "@supabase/supabase-js";
 
 // ═══════════════════════════════════════════════════════════════════
-// BATCAVE CONSOLE v2.3 — Mobile-first Command Surface
+// BATCAVE CONSOLE v2.8 — Supabase Auth + Secrets
 // ═══════════════════════════════════════════════════════════════════
+
+// ─── Supabase Client ─────────────────────────────────────────────
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+
+// ─── Auth Hook ───────────────────────────────────────────────────
+function useAuth() {
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!supabase) { setLoading(false); return; }
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const signIn = async (email, password) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    return error;
+  };
+
+  const signUp = async (email, password) => {
+    const { error } = await supabase.auth.signUp({ email, password });
+    return error;
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+  };
+
+  return { session, loading, signIn, signUp, signOut };
+}
 
 // ─── Brand Tokens ────────────────────────────────────────────────
 const C = {
@@ -103,11 +146,10 @@ const manifest = {
 
 // ─── Integration Registry ────────────────────────────────────────
 const INTEGRATIONS = {
-  github: { id: "github", label: "GitHub", desc: "Repo commits, branches, PR status", envKey: "GH_TOKEN" },
-  vercel: { id: "vercel", label: "Vercel", desc: "Deploy status, build logs, domains", envKey: "VERCEL_API_TOKEN" },
-  finnhub: { id: "finnhub", label: "Finnhub", desc: "Stock quotes, market news, indices", envKey: "FINNHUB_API_KEY" },
-  gmail: { id: "gmail", label: "Gmail", desc: "Priority inbox, email threads", envKey: "GMAIL_TOKEN" },
-  gcal: { id: "gcal", label: "Google Calendar", desc: "Daily agenda, scheduling, events", envKey: "GCAL_TOKEN" },
+  finnhub: { id: "finnhub", label: "Finnhub", desc: "Stock quotes, market news, indices" },
+  github: { id: "github", label: "GitHub", desc: "Repo commits, branches, PR status" },
+  gmail: { id: "gmail", label: "Gmail", desc: "Priority inbox, email threads" },
+  gcal: { id: "gcal", label: "Google Calendar", desc: "Daily agenda, scheduling, events" },
 };
 
 // Vercel project IDs for live deploy lookup
@@ -289,6 +331,112 @@ const statusConfig = {
 };
 
 const typeLabels = { app: "APP", poc: "POC", extension: "EXT", library: "LIB" };
+
+// ─── Login Screen ────────────────────────────────────────────────
+function LoginScreen({ onLogin, isMobile }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState("login"); // login | signup
+
+  const handleSubmit = async () => {
+    if (!email || !password) return;
+    setLoading(true);
+    setError(null);
+    const err = mode === "login"
+      ? await onLogin.signIn(email, password)
+      : await onLogin.signUp(email, password);
+    setLoading(false);
+    if (err) setError(err.message);
+    else if (mode === "signup") setError(null);
+  };
+
+  const inputStyle = {
+    width: "100%", background: C.obsidian, border: `1px solid ${C.slate}`,
+    borderRadius: "4px", padding: isMobile ? "14px" : "10px 14px",
+    fontFamily: F.sans, fontSize: isMobile ? "16px" : "14px",
+    color: C.parchment, outline: "none",
+  };
+
+  return (
+    <div style={{
+      minHeight: "100vh", backgroundColor: C.obsidian, display: "flex",
+      alignItems: "center", justifyContent: "center", padding: "20px",
+      fontFamily: F.sans, WebkitFontSmoothing: "antialiased",
+    }}>
+      <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@300;400;500&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet" />
+      <style>{`
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        ::selection { background: ${C.amber}; color: ${C.obsidian}; }
+        input::placeholder { color: ${C.iron}; }
+      `}</style>
+
+      <div style={{
+        width: "100%", maxWidth: "360px",
+        animation: "fadeUp 0.5s cubic-bezier(0.22,1,0.36,1)",
+      }}>
+        <style>{`@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+
+        {/* Logo */}
+        <div style={{ textAlign: "center", marginBottom: "40px" }}>
+          <div style={{ width: "48px", height: "48px", color: C.amber, margin: "0 auto 16px" }}>{I.bat}</div>
+          <div style={{ fontFamily: F.display, fontSize: "32px", color: C.cream, marginBottom: "6px" }}>Batcave</div>
+          <div style={{ fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: C.iron }}>Command Center</div>
+        </div>
+
+        {/* Form */}
+        <div style={{
+          backgroundColor: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "8px",
+          padding: isMobile ? "24px 20px" : "28px 24px",
+        }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "16px" }}>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+              placeholder="Email" style={inputStyle}
+              onFocus={e => e.currentTarget.style.borderColor = C.amber}
+              onBlur={e => e.currentTarget.style.borderColor = C.slate}
+              onKeyDown={e => e.key === "Enter" && handleSubmit()}
+            />
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+              placeholder="Password" style={inputStyle}
+              onFocus={e => e.currentTarget.style.borderColor = C.amber}
+              onBlur={e => e.currentTarget.style.borderColor = C.slate}
+              onKeyDown={e => e.key === "Enter" && handleSubmit()}
+            />
+          </div>
+
+          {error && (
+            <div style={{
+              padding: "8px 12px", borderRadius: "4px", marginBottom: "12px",
+              backgroundColor: "rgba(154,74,74,0.1)", border: "1px solid rgba(154,74,74,0.2)",
+              fontFamily: F.sans, fontSize: "12px", color: C.danger,
+            }}>{error}</div>
+          )}
+
+          <button onClick={handleSubmit} disabled={loading || !email || !password} style={{
+            width: "100%", background: C.amber, border: "none", borderRadius: "4px",
+            padding: isMobile ? "14px" : "10px",
+            fontFamily: F.mono, fontSize: "12px", fontWeight: 600, letterSpacing: "0.04em",
+            color: C.obsidian, cursor: "pointer",
+            opacity: loading || !email || !password ? 0.5 : 1,
+          }}>
+            {loading ? "..." : mode === "login" ? "Sign In" : "Create Account"}
+          </button>
+
+          <div style={{ textAlign: "center", marginTop: "16px" }}>
+            <button onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(null); }}
+              style={{
+                background: "none", border: "none", cursor: "pointer",
+                fontFamily: F.sans, fontSize: "12px", color: C.iron,
+              }}>
+              {mode === "login" ? "Need an account? Sign up" : "Already have an account? Sign in"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Command Bar ─────────────────────────────────────────────────
 function CommandBar({ onClose, isMobile }) {
@@ -848,7 +996,7 @@ function HomepageModule({ isMobile }) {
 }
 
 // ─── Integrations Module ─────────────────────────────────────────
-function IntegrationsModule({ isMobile, liveData }) {
+function IntegrationsModule({ isMobile, liveData, session }) {
   const { status, loading, refresh } = liveData || {};
   const [configuring, setConfiguring] = useState(null);
   const [keyInput, setKeyInput] = useState("");
@@ -856,9 +1004,8 @@ function IntegrationsModule({ isMobile, liveData }) {
   const [configError, setConfigError] = useState(null);
 
   const icons = {
-    github: I.external,
-    vercel: I.deploy,
     finnhub: I.signal,
+    github: I.external,
     gmail: I.layers,
     gcal: I.layers,
   };
@@ -880,15 +1027,6 @@ function IntegrationsModule({ isMobile, liveData }) {
       ],
       configurable: true,
     },
-    vercel: {
-      steps: [
-        { text: "Create a Vercel API token", link: "https://vercel.com/account/tokens", linkLabel: "Open tokens" },
-        { text: "Full Account scope, 90 day expiration" },
-      ],
-      configurable: false,
-      note: "The Vercel token bootstraps all other integrations and must be set manually.",
-      manualLink: "https://vercel.com/anthonyschroeck-wqs-projects/batcave/settings/environment-variables",
-    },
     gmail: {
       steps: [{ text: "OAuth integration — coming soon" }],
       configurable: false,
@@ -906,7 +1044,10 @@ function IntegrationsModule({ isMobile, liveData }) {
     try {
       const res = await fetch("/api/configure", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ service: serviceId, key: keyInput.trim() }),
       });
       const data = await res.json();
@@ -1144,12 +1285,28 @@ function PlaceholderModule({ description, items, isMobile }) {
 // ═══════════════════════════════════════════════════════════════════
 export default function BatcaveConsole() {
   const isMobile = useMobile();
+  const auth = useAuth();
   const [activeModule, setActiveModule] = useState("home");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const liveData = useLiveData();
+
+  useEffect(() => { setMounted(true); }, []);
+
+  // Auth gate
+  if (auth.loading) {
+    return (
+      <div style={{ minHeight: "100vh", backgroundColor: C.obsidian, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontFamily: F.mono, fontSize: "12px", color: C.iron }}>Loading...</div>
+      </div>
+    );
+  }
+
+  if (!auth.session && supabase) {
+    return <LoginScreen onLogin={auth} isMobile={isMobile} />;
+  }
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -1271,12 +1428,20 @@ export default function BatcaveConsole() {
         </div>
       )}
 
-      {/* Version */}
+      {/* Sign out + Version */}
       {(isMobile || !collapsed) && (
         <div style={{
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
-          fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em",
-        }}>v2.7 // batcave</div>
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+        }}>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v2.8 // batcave</span>
+          {auth.session && (
+            <button onClick={auth.signOut} style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontFamily: F.mono, fontSize: "9px", color: C.iron, letterSpacing: "0.04em",
+            }}>sign out</button>
+          )}
+        </div>
       )}
     </>
   );
@@ -1430,7 +1595,7 @@ export default function BatcaveConsole() {
           <div key={activeModule + "-content"}>
             {activeModule === "home" && <HomepageModule isMobile={isMobile} />}
             {activeModule === "projects" && <ProjectsModule isMobile={isMobile} liveData={liveData} />}
-            {activeModule === "integrations" && <IntegrationsModule isMobile={isMobile} liveData={liveData} />}
+            {activeModule === "integrations" && <IntegrationsModule isMobile={isMobile} liveData={liveData} session={auth.session} />}
             {!["home","projects","integrations"].includes(activeModule) && placeholders[activeModule] && (
               <PlaceholderModule description={placeholders[activeModule].description} items={placeholders[activeModule].items} isMobile={isMobile} />
             )}

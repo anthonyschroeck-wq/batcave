@@ -1,6 +1,6 @@
 {
   "name": "batcave",
-  "version": "2.0.0",
+  "version": "2.7.0",
   "private": true,
   "description": "Central nervous system — unified monorepo",
   "scripts": {
@@ -10,6 +10,9 @@
     "status": "node scripts/status.cjs",
     "scaffold": "node scripts/scaffold.cjs",
     "add": "node scripts/add-project.cjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.0"
   },
   "engines": {
     "node": ">=20",
