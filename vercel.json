@@ -1,0 +1,9 @@
+{
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm --filter console build",
+  "outputDirectory": "packages/console/dist",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}
