@@ -105,6 +105,7 @@ const manifest = {
 const INTEGRATIONS = {
   github: { id: "github", label: "GitHub", desc: "Repo commits, branches, PR status", envKey: "GH_TOKEN" },
   vercel: { id: "vercel", label: "Vercel", desc: "Deploy status, build logs, domains", envKey: "VERCEL_API_TOKEN" },
+  finnhub: { id: "finnhub", label: "Finnhub", desc: "Stock quotes, market news, indices", envKey: "FINNHUB_API_KEY" },
   gmail: { id: "gmail", label: "Gmail", desc: "Priority inbox, email threads", envKey: "GMAIL_TOKEN" },
   gcal: { id: "gcal", label: "Google Calendar", desc: "Daily agenda, scheduling, events", envKey: "GCAL_TOKEN" },
 };
@@ -264,6 +265,11 @@ const I = {
   close: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M18 6L6 18" /><path d="M6 6l12 12" />
+    </svg>
+  ),
+  home: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12l9-8 9 8" /><path d="M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9" />
     </svg>
   ),
   bat: (
@@ -639,6 +645,208 @@ function ProjectsModule({ isMobile, liveData }) {
   );
 }
 
+// ─── Homepage Module ─────────────────────────────────────────────
+function HomepageModule({ isMobile }) {
+  const [markets, setMarkets] = useState(null);
+  const [news, setNews] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [mkts, nws] = await Promise.all([
+        fetch("/api/markets").then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch("/api/news?category=general").then(r => r.ok ? r.json() : null).catch(() => null),
+      ]);
+      setMarkets(mkts);
+      setNews(nws);
+      if (!mkts && !nws) setError("Connect Finnhub in Integrations to enable live data.");
+    } catch {
+      setError("Failed to fetch data.");
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const formatTime = (unix) => {
+    if (!unix) return "";
+    const d = new Date(unix * 1000);
+    const now = new Date();
+    const diffH = Math.floor((now - d) / 3600000);
+    if (diffH < 1) return `${Math.floor((now - d) / 60000)}m ago`;
+    if (diffH < 24) return `${diffH}h ago`;
+    return d.toLocaleDateString();
+  };
+
+  return (
+    <div style={{ animation: "fadeUp 0.4s ease both" }}>
+
+      {/* Market Indices */}
+      <div style={{ marginBottom: "32px" }}>
+        <div style={{
+          fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.08em",
+          textTransform: "uppercase", color: C.amber, marginBottom: "16px",
+        }}>Markets</div>
+
+        {loading && !markets && (
+          <div style={{ fontFamily: F.mono, fontSize: "12px", color: C.iron }}>Loading market data...</div>
+        )}
+
+        {error && !markets && (
+          <div style={{
+            padding: isMobile ? "16px" : "20px", borderRadius: "6px",
+            backgroundColor: C.cavern, border: `1px solid ${C.stone}`,
+            fontFamily: F.sans, fontSize: "13px", color: C.fog, lineHeight: 1.6,
+          }}>{error}</div>
+        )}
+
+        {markets?.indices && (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+            gap: "12px",
+          }}>
+            {markets.indices.map((idx, i) => {
+              const up = idx.change >= 0;
+              return (
+                <div key={idx.id} style={{
+                  backgroundColor: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
+                  padding: isMobile ? "16px" : "20px",
+                  animation: `fadeUp 0.35s ease ${0.06 * i}s both`,
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                    <div>
+                      <div style={{ fontFamily: F.sans, fontSize: "12px", fontWeight: 600, color: C.fog }}>{idx.label}</div>
+                      <div style={{ fontFamily: F.mono, fontSize: "10px", color: C.iron }}>{idx.symbol}</div>
+                    </div>
+                    <div style={{
+                      fontFamily: F.mono, fontSize: "10px", padding: "2px 8px", borderRadius: "3px",
+                      backgroundColor: up ? "rgba(90,138,106,0.12)" : "rgba(154,74,74,0.12)",
+                      color: up ? C.success : C.danger,
+                    }}>
+                      {up ? "+" : ""}{idx.changePct?.toFixed(2)}%
+                    </div>
+                  </div>
+                  <div style={{
+                    fontFamily: F.display, fontSize: isMobile ? "28px" : "32px",
+                    color: C.cream, lineHeight: 1, marginBottom: "6px",
+                  }}>
+                    {idx.price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontFamily: F.mono, fontSize: "10px", color: up ? C.success : C.danger }}>
+                    {up ? "+" : ""}{idx.change?.toFixed(2)}
+                  </div>
+                  <div style={{
+                    display: "flex", gap: "12px", marginTop: "8px",
+                    fontFamily: F.mono, fontSize: "9px", color: C.iron,
+                  }}>
+                    <span>H {idx.high?.toFixed(2)}</span>
+                    <span>L {idx.low?.toFixed(2)}</span>
+                    <span>O {idx.open?.toFixed(2)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* News */}
+      <div>
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          marginBottom: "16px",
+        }}>
+          <div style={{
+            fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.08em",
+            textTransform: "uppercase", color: C.amber,
+          }}>Top News</div>
+          <button onClick={fetchData} style={{
+            background: "none", border: `1px solid ${C.slate}`, borderRadius: "3px",
+            padding: isMobile ? "6px 12px" : "2px 8px",
+            fontFamily: F.mono, fontSize: "10px", color: C.amber,
+            cursor: "pointer", minHeight: isMobile ? "32px" : undefined,
+          }}>
+            {loading ? "..." : "refresh"}
+          </button>
+        </div>
+
+        {loading && !news && (
+          <div style={{ fontFamily: F.mono, fontSize: "12px", color: C.iron }}>Loading headlines...</div>
+        )}
+
+        {news?.articles && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+            {news.articles.map((article, i) => (
+              <a key={article.id || i} href={article.url} target="_blank" rel="noopener noreferrer"
+                style={{
+                  display: "flex", gap: "14px", padding: isMobile ? "14px 0" : "12px 0",
+                  borderBottom: `1px solid ${C.stone}`,
+                  textDecoration: "none", color: "inherit",
+                  minHeight: isMobile ? "60px" : undefined,
+                  animation: `fadeUp 0.3s ease ${0.03 * i}s both`,
+                  transition: "background-color 0.15s ease",
+                }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = C.amberSubtle}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
+              >
+                {/* Thumbnail */}
+                {article.image && !isMobile && (
+                  <div style={{
+                    width: "80px", height: "54px", borderRadius: "4px", overflow: "hidden",
+                    flexShrink: 0, backgroundColor: C.stone,
+                  }}>
+                    <img src={article.image} alt="" style={{
+                      width: "100%", height: "100%", objectFit: "cover",
+                    }} onError={e => e.currentTarget.style.display = "none"} />
+                  </div>
+                )}
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontFamily: F.sans, fontSize: isMobile ? "14px" : "13px", fontWeight: 500,
+                    color: C.parchment, lineHeight: 1.4, marginBottom: "4px",
+                    display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+                  }}>{article.headline}</div>
+                  {article.summary && !isMobile && (
+                    <div style={{
+                      fontFamily: F.sans, fontSize: "12px", color: C.iron, lineHeight: 1.4,
+                      display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden",
+                    }}>{article.summary}</div>
+                  )}
+                  <div style={{
+                    display: "flex", gap: "10px", marginTop: "4px",
+                    fontFamily: F.mono, fontSize: "10px", color: C.iron,
+                  }}>
+                    <span style={{ color: C.amber }}>{article.source}</span>
+                    <span>{formatTime(article.datetime)}</span>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+
+        {!loading && !news && !error && (
+          <div style={{
+            padding: isMobile ? "24px 16px" : "32px 20px", borderRadius: "6px",
+            backgroundColor: C.cavern, border: `1px solid ${C.stone}`,
+            textAlign: "center",
+          }}>
+            <div style={{ fontFamily: F.display, fontSize: "22px", color: C.cream, marginBottom: "8px" }}>No data yet</div>
+            <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.iron, lineHeight: 1.6 }}>
+              Add your Finnhub API key in Integrations to surface live markets and news.
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Integrations Module ─────────────────────────────────────────
 function IntegrationsModule({ isMobile, liveData }) {
   const { status, loading, refresh } = liveData || {};
@@ -647,6 +855,7 @@ function IntegrationsModule({ isMobile, liveData }) {
   const icons = {
     github: I.external,
     vercel: I.deploy,
+    finnhub: I.signal,
     gmail: I.layers,
     gcal: I.layers,
   };
@@ -785,7 +994,7 @@ function PlaceholderModule({ description, items, isMobile }) {
 // ═══════════════════════════════════════════════════════════════════
 export default function BatcaveConsole() {
   const isMobile = useMobile();
-  const [activeModule, setActiveModule] = useState("projects");
+  const [activeModule, setActiveModule] = useState("home");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
@@ -815,6 +1024,7 @@ export default function BatcaveConsole() {
   }, [isMobile]);
 
   const modules = [
+    { id: "home", label: "Home", icon: I.home },
     { id: "projects", label: "Projects", icon: I.workspace },
     { id: "agents", label: "Agents", icon: I.agent },
     { id: "tasks", label: "Tasks", icon: I.tasks },
@@ -824,6 +1034,7 @@ export default function BatcaveConsole() {
   ];
 
   const moduleMeta = {
+    home: { title: "Briefing", mono: "Command Center", subtitle: new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) },
     projects: { title: "Projects", mono: "System Registry", subtitle: `${manifest.projects.length} registered across the system` },
     agents: { title: "Agents", mono: "Autonomous Systems", subtitle: "Build and manage autonomous workflows" },
     tasks: { title: "Tasks", mono: "Personal Ops", subtitle: "Priority-driven task management" },
@@ -915,7 +1126,7 @@ export default function BatcaveConsole() {
         <div style={{
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em",
-        }}>v2.5 // batcave</div>
+        }}>v2.6 // batcave</div>
       )}
     </>
   );
@@ -1067,9 +1278,10 @@ export default function BatcaveConsole() {
           }} />
 
           <div key={activeModule + "-content"}>
+            {activeModule === "home" && <HomepageModule isMobile={isMobile} />}
             {activeModule === "projects" && <ProjectsModule isMobile={isMobile} liveData={liveData} />}
             {activeModule === "integrations" && <IntegrationsModule isMobile={isMobile} liveData={liveData} />}
-            {activeModule !== "projects" && activeModule !== "integrations" && placeholders[activeModule] && (
+            {!["home","projects","integrations"].includes(activeModule) && placeholders[activeModule] && (
               <PlaceholderModule description={placeholders[activeModule].description} items={placeholders[activeModule].items} isMobile={isMobile} />
             )}
           </div>
