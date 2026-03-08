@@ -1,563 +1,554 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
-// -- Manifest data (Phase 2: fetch from GitHub API) --
-const manifest = {
-  projects: [
-    { slug: "console", name: "Batcave Console", status: "active", type: "app", migrated: true, deploy: "https://batcave-console.vercel.app", notes: "Dashboard UI — the Batcave itself" },
-    { slug: "omote", name: "Omote", status: "active", type: "app", migrated: false, deploy: null, notes: "Demo stage designer with Okta SSO, config manifest, AI insights" },
-    { slug: "cerebro", name: "Cerebro", status: "active", type: "app", migrated: false, deploy: null, notes: "External repo — pending integration" },
-    { slug: "fox-market", name: "Fox Market", status: "active", type: "app", migrated: false, deploy: null, notes: "AI trading simulator, Monte Carlo forecasting, Ask Fox" },
-    { slug: "run-recipes", name: "Run Recipes", status: "active", type: "app", migrated: false, deploy: null, notes: "Meal management, sidebar nav, Yes Chef scoring" },
-    { slug: "syndio-mockups", name: "Syndio Mockups", status: "active", type: "poc", migrated: false, deploy: null, notes: "Pay equity and HR tech multi-POC workspace" },
-    { slug: "veritas", name: "Veritas", status: "incubating", type: "extension", migrated: false, deploy: null, notes: "Chrome extension — AI content detection, Manifest V3" },
-  ]
+// ═══════════════════════════════════════════════════════════════════
+// BATCAVE CONSOLE — Command Surface
+// Design system: batcave-brand-kit.jsx
+// ═══════════════════════════════════════════════════════════════════
+
+// ─── Brand Tokens ────────────────────────────────────────────────
+const C = {
+  obsidian: "#111115",
+  cavern: "#1a1a20",
+  stone: "#252530",
+  slate: "#3a3a48",
+  iron: "#5a5a6a",
+  pewter: "#888898",
+  fog: "#b0b0bc",
+  parchment: "#e8e4db",
+  cream: "#f5f1e8",
+  amber: "#c4973a",
+  amberLight: "#d4aa50",
+  amberGlow: "rgba(196, 151, 58, 0.12)",
+  amberSubtle: "rgba(196, 151, 58, 0.06)",
+  embers: "#a3783a",
+  success: "#5a8a6a",
+  caution: "#b89040",
+  danger: "#9a4a4a",
 };
 
-// -- SVG Icons (line-work, 1.4px stroke, round caps) --
-const Icons = {
-  projects: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="3" width="7" height="7" rx="1" />
-      <rect x="3" y="14" width="7" height="7" rx="1" />
-      <rect x="14" y="14" width="7" height="7" rx="1" />
+const F = {
+  display: "'Cormorant Garamond', Georgia, serif",
+  body: "'Source Serif 4', Georgia, serif",
+  mono: "'IBM Plex Mono', 'Courier New', monospace",
+  sans: "'Source Sans 3', 'Helvetica Neue', sans-serif",
+};
+
+// ─── Manifest (Phase 2: live fetch from GitHub API) ──────────────
+const manifest = {
+  projects: [
+    { slug: "console", name: "Batcave Console", status: "active", type: "app", migrated: true, deploy: "https://batcave-sage.vercel.app", notes: "Dashboard UI — the Batcave itself" },
+    { slug: "omote", name: "Omote", status: "active", type: "app", migrated: false, deploy: "https://omote-one.vercel.app", notes: "Demo stage designer — Supabase backend, JSX sandboxing, multi-cue system" },
+    { slug: "cerebro", name: "Cerebro", status: "active", type: "app", migrated: false, deploy: null, notes: "GTM intelligence dashboard — NL queries, sentiment, trend charts" },
+    { slug: "run-recipes", name: "Run Recipes", status: "active", type: "app", migrated: false, deploy: null, notes: "Meal management, sidebar nav, Yes Chef scoring" },
+    { slug: "veritas", name: "Veritas", status: "incubating", type: "extension", migrated: false, deploy: null, notes: "Chrome extension — AI content detection, Manifest V3" },
+  ],
+};
+
+// ─── Icons (24x24, 1.2px stroke, round caps) ─────────────────────
+const I = {
+  command: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 8V6a2 2 0 0 1 2-2h2" /><path d="M4 16v2a2 2 0 0 0 2 2h2" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v2" /><path d="M16 20h2a2 2 0 0 0 2-2v-2" />
+      <circle cx="12" cy="12" r="2" /><path d="M12 8v2" /><path d="M12 14v2" /><path d="M8 12h2" /><path d="M14 12h2" />
     </svg>
   ),
-  agents: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+  workspace: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" /><path d="M17.5 14v7" /><path d="M14 17.5h7" />
+    </svg>
+  ),
+  agent: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="4" /><path d="M6 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+      <circle cx="12" cy="8" r="1" fill="currentColor" />
     </svg>
   ),
   tasks: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 11l3 3L22 4" />
-      <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
     </svg>
   ),
-  fitness: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20.42 4.58a5.4 5.4 0 00-7.65 0l-.77.78-.77-.78a5.4 5.4 0 00-7.65 0C1.46 6.7 1.33 10.28 4 13l8 8 8-8c2.67-2.72 2.54-6.3.42-8.42z" />
+  signal: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20V10" /><path d="M8 20v-6" /><path d="M16 20v-8" /><path d="M4 20v-2" /><path d="M20 20v-4" />
     </svg>
   ),
-  calendar: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="18" rx="2" />
-      <path d="M16 2v4M8 2v4M3 10h18" />
+  pulse: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12h4l3-8 4 16 3-8h4" />
     </svg>
   ),
-  external: (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+  settings: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 3v2m0 14v2M3 12h2m14 0h2" />
+      <path d="M5.6 5.6l1.4 1.4m9.9 9.9l1.4 1.4M5.6 18.4l1.4-1.4m9.9-9.9l1.4-1.4" />
+    </svg>
+  ),
+  search: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="6" /><path d="M15.5 15.5L20 20" />
     </svg>
   ),
   chevron: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 18l6-6-6-6" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 6l6 6-6 6" />
+    </svg>
+  ),
+  deploy: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3v12" /><path d="M8 11l4 4 4-4" />
+      <path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2" />
+    </svg>
+  ),
+  external: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+    </svg>
+  ),
+  layers: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 4l-8 4 8 4 8-4-8-4z" /><path d="M4 12l8 4 8-4" /><path d="M4 16l8 4 8-4" />
     </svg>
   ),
   bat: (
-    <svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M16 8c-2 2-6 3-10 2 1 3 3 5 6 6-2 2-5 3-8 3 4 3 9 4 13 2v3l-1 2h1l1-1 1 1h1l-1-2v-3c4 2 9 1 13-2-3 0-6-1-8-3 3-1 5-3 6-6-4 1-8 0-10-2z" />
+    <svg viewBox="0 0 48 48" fill="none">
+      <path d="M24 8 L8 28 L14 26 L18 32 L22 24 L24 30 L26 24 L30 32 L34 26 L40 28 L24 8Z"
+        stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+      <line x1="12" y1="38" x2="36" y2="38" stroke="currentColor" strokeWidth="0.8" opacity="0.4" />
     </svg>
   ),
 };
 
 const statusConfig = {
-  active: { label: "Active", color: "#34d399" },
-  incubating: { label: "Incubating", color: "#fbbf24" },
-  archived: { label: "Archived", color: "#6b7280" },
-  migrating: { label: "Migrating", color: "#60a5fa" },
+  active: { label: "Active", color: C.success },
+  incubating: { label: "Incubating", color: C.caution },
+  archived: { label: "Archived", color: C.iron },
+  migrating: { label: "Migrating", color: C.amberLight },
 };
 
 const typeLabels = { app: "APP", poc: "POC", extension: "EXT", library: "LIB" };
 
-// -- Placeholder Module --
-function PlaceholderModule({ title, description, items }) {
+// ─── Command Bar ─────────────────────────────────────────────────
+function CommandBar({ onClose }) {
+  const [query, setQuery] = useState("");
+  const inputRef = useRef(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const commands = [
+    { label: "Deploy Omote", hint: "push to production", icon: I.deploy },
+    { label: "Check build status", hint: "all projects", icon: I.pulse },
+    { label: "Open Cerebro", hint: "GTM dashboard", icon: I.signal },
+    { label: "View agents", hint: "3 active", icon: I.agent },
+    { label: "New project", hint: "scaffold from template", icon: I.workspace },
+  ];
+
+  const filtered = commands.filter(c =>
+    c.label.toLowerCase().includes(query.toLowerCase()) ||
+    c.hint.toLowerCase().includes(query.toLowerCase())
+  );
+
   return (
-    <div style={{ animation: "fadeUp 0.4s ease both" }}>
-      <p style={{
-        fontFamily: "var(--font-body)",
-        fontSize: 14,
-        fontWeight: 300,
-        color: "var(--color-muted)",
-        marginBottom: 32,
-        maxWidth: 480,
-        lineHeight: 1.6
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.6)",
+      backdropFilter: "blur(8px)", display: "flex", alignItems: "flex-start",
+      justifyContent: "center", paddingTop: "18vh", zIndex: 100,
+      animation: "fadeIn 0.15s ease",
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: "100%", maxWidth: "520px",
+        backgroundColor: C.cavern, border: `1px solid ${C.slate}`,
+        borderRadius: "10px", overflow: "hidden",
+        boxShadow: `0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px ${C.stone}`,
+        animation: "slideUp 0.2s cubic-bezier(0.22,1,0.36,1)",
       }}>
-        {description}
-      </p>
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-        gap: 12,
-      }}>
-        {items.map((item, i) => (
-          <div key={i} style={{
-            border: "1px dashed var(--color-border)",
-            borderRadius: 3,
-            padding: "20px 18px",
-            animation: `fadeUp 0.4s ease ${0.05 * (i + 1)}s both`,
-          }}>
-            <div style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 10,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              color: "var(--color-muted)",
-              marginBottom: 6
-            }}>{item.label}</div>
-            <div style={{
-              fontFamily: "var(--font-display)",
-              fontSize: 17,
-              color: "var(--color-navy)",
-              marginBottom: 4
-            }}>{item.title}</div>
-            <div style={{
-              fontSize: 12,
-              fontWeight: 300,
-              color: "var(--color-muted)",
-              lineHeight: 1.4
-            }}>{item.desc}</div>
-          </div>
-        ))}
+        <div style={{
+          display: "flex", alignItems: "center", gap: "10px",
+          padding: "14px 18px", borderBottom: `1px solid ${C.stone}`,
+        }}>
+          <div style={{ width: "18px", height: "18px", color: C.amber, flexShrink: 0 }}>{I.search}</div>
+          <input ref={inputRef} value={query} onChange={e => setQuery(e.target.value)}
+            placeholder="Search commands, projects, agents..."
+            style={{
+              flex: 1, background: "none", border: "none", outline: "none",
+              fontFamily: F.sans, fontSize: "15px", color: C.parchment,
+            }}
+          />
+          <kbd style={{
+            fontFamily: F.mono, fontSize: "10px", color: C.iron,
+            padding: "2px 6px", borderRadius: "3px", backgroundColor: C.obsidian,
+            border: `1px solid ${C.slate}`,
+          }}>esc</kbd>
+        </div>
+
+        <div style={{ padding: "6px 0", maxHeight: "320px", overflowY: "auto" }}>
+          {filtered.map((cmd, i) => (
+            <div key={i} style={{
+              display: "flex", alignItems: "center", gap: "12px",
+              padding: "10px 18px", cursor: "pointer",
+              transition: "background-color 0.15s ease",
+            }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = C.stone}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
+            >
+              <div style={{ width: "18px", height: "18px", color: C.iron, flexShrink: 0 }}>{cmd.icon}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.parchment }}>{cmd.label}</div>
+                <div style={{ fontFamily: F.mono, fontSize: "10px", color: C.iron, marginTop: "1px" }}>{cmd.hint}</div>
+              </div>
+            </div>
+          ))}
+          {filtered.length === 0 && (
+            <div style={{ padding: "20px 18px", fontFamily: F.sans, fontSize: "13px", color: C.iron, textAlign: "center" }}>
+              No matching commands
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-// -- Projects Module --
-function ProjectsModule() {
-  const [expandedSlug, setExpandedSlug] = useState(null);
-  const active = manifest.projects.filter(p => p.status === "active");
-  const other = manifest.projects.filter(p => p.status !== "active");
+// ─── Nav Item ────────────────────────────────────────────────────
+function NavItem({ icon, label, active, collapsed, onClick }) {
+  const [hovered, setHovered] = useState(false);
+  const lit = active || hovered;
+  return (
+    <button onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "flex", alignItems: "center", gap: "10px",
+        width: "100%", padding: collapsed ? "9px 0" : "9px 14px",
+        justifyContent: collapsed ? "center" : "flex-start",
+        background: active ? C.amberSubtle : "transparent",
+        border: "none",
+        borderLeft: `2px solid ${active ? C.amber : "transparent"}`,
+        cursor: "pointer", borderRadius: 0,
+        transition: "all 0.2s ease",
+      }}>
+      <div style={{
+        width: "18px", height: "18px", flexShrink: 0,
+        color: lit ? C.amber : C.iron, transition: "color 0.2s ease",
+      }}>{icon}</div>
+      {!collapsed && (
+        <span style={{
+          fontFamily: F.sans, fontSize: "13px", fontWeight: active ? 600 : 400,
+          color: lit ? C.parchment : C.fog, transition: "color 0.2s ease", whiteSpace: "nowrap",
+        }}>{label}</span>
+      )}
+    </button>
+  );
+}
 
-  const ProjectRow = ({ project, index }) => {
-    const isExpanded = expandedSlug === project.slug;
-    const sc = statusConfig[project.status];
-    return (
-      <div
-        onClick={() => setExpandedSlug(isExpanded ? null : project.slug)}
+// ─── Project Row ─────────────────────────────────────────────────
+function ProjectRow({ project, index }) {
+  const [expanded, setExpanded] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const sc = statusConfig[project.status];
+
+  return (
+    <div style={{ animation: `fadeUp 0.35s ease ${0.04 * index}s both` }}>
+      <div onClick={() => setExpanded(!expanded)}
+        onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
         style={{
-          padding: "14px 0",
-          borderBottom: "1px solid var(--color-border)",
+          display: "flex", alignItems: "center", gap: "12px",
+          padding: "14px 0", borderBottom: `1px solid ${C.stone}`,
           cursor: "pointer",
-          animation: `fadeUp 0.35s ease ${0.04 * index}s both`,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {/* Status dot */}
-          <div style={{
-            width: 7,
-            height: 7,
-            borderRadius: "50%",
-            backgroundColor: sc.color,
-            flexShrink: 0,
-          }} />
-
-          {/* Name */}
-          <div style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 17,
-            flex: 1,
-            color: "var(--color-navy)",
-          }}>
-            {project.name}
-          </div>
-
-          {/* Type badge */}
-          <span style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 9,
-            letterSpacing: "0.06em",
-            padding: "2px 8px",
-            border: "1px solid var(--color-border)",
-            borderRadius: 2,
-            color: "var(--color-muted)",
-          }}>
-            {typeLabels[project.type]}
-          </span>
-
-          {/* Migration indicator */}
-          {!project.migrated && (
-            <span style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 9,
-              color: "var(--color-muted)",
-              display: "flex",
-              alignItems: "center",
-              gap: 3
-            }}>
-              {Icons.external} ext
-            </span>
-          )}
-
-          {/* Chevron */}
-          <span style={{
-            transform: isExpanded ? "rotate(90deg)" : "rotate(0)",
-            transition: "transform 0.2s ease",
-            color: "var(--color-muted)",
-            display: "flex"
-          }}>
-            {Icons.chevron}
-          </span>
-        </div>
-
-        {isExpanded && (
-          <div style={{
-            marginTop: 12,
-            marginLeft: 19,
-            paddingLeft: 12,
-            borderLeft: "1.4px solid var(--color-border)",
-          }}>
-            <div style={{
-              fontSize: 13,
-              fontWeight: 300,
-              color: "var(--color-muted)",
-              lineHeight: 1.5,
-              marginBottom: 10
-            }}>
-              {project.notes}
-            </div>
-            <div style={{
-              display: "flex",
-              gap: 16,
-              fontFamily: "var(--font-mono)",
-              fontSize: 10,
-              color: "var(--color-muted)",
-            }}>
-              <span>Status: {sc.label}</span>
-              <span>Slug: {project.slug}</span>
-              {project.deploy && (
-                <span style={{ color: "var(--color-navy)" }}>
-                  Deployed
-                </span>
-              )}
-            </div>
-          </div>
+        }}>
+        <div style={{
+          width: "7px", height: "7px", borderRadius: "50%",
+          backgroundColor: sc.color, flexShrink: 0,
+          animation: project.status === "active" ? "breathe 3s ease-in-out infinite" : "none",
+        }} />
+        <div style={{
+          fontFamily: F.display, fontSize: "18px", flex: 1,
+          color: hovered ? C.cream : C.parchment, transition: "color 0.2s ease",
+        }}>{project.name}</div>
+        <span style={{
+          fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.06em",
+          padding: "2px 8px", border: `1px solid ${C.slate}`, borderRadius: "3px", color: C.iron,
+        }}>{typeLabels[project.type]}</span>
+        {!project.migrated && (
+          <span style={{ width: "12px", height: "12px", color: C.iron, display: "flex" }}>{I.external}</span>
         )}
+        <span style={{
+          width: "14px", height: "14px", color: hovered ? C.amber : C.iron,
+          transform: expanded ? "rotate(90deg)" : "rotate(0)",
+          transition: "transform 0.2s ease, color 0.2s ease", display: "flex",
+        }}>{I.chevron}</span>
       </div>
-    );
-  };
+
+      {expanded && (
+        <div style={{
+          padding: "14px 0 14px 19px",
+          borderBottom: `1px solid ${C.stone}`,
+          borderLeft: `2px solid ${C.amber}`, paddingLeft: "16px",
+          animation: "fadeUp 0.2s ease both",
+        }}>
+          <div style={{
+            fontFamily: F.body, fontSize: "14px", fontWeight: 300,
+            color: C.fog, lineHeight: 1.6, marginBottom: "12px",
+          }}>{project.notes}</div>
+          <div style={{
+            display: "flex", gap: "20px", flexWrap: "wrap",
+            fontFamily: F.mono, fontSize: "10px", color: C.iron,
+          }}>
+            <span>status: <span style={{ color: sc.color }}>{sc.label.toLowerCase()}</span></span>
+            <span>slug: {project.slug}</span>
+            {project.deploy && (
+              <a href={project.deploy} target="_blank" rel="noopener noreferrer"
+                style={{ color: C.amber, textDecoration: "none" }}>deployed</a>
+            )}
+            {project.migrated && <span style={{ color: C.success }}>in-repo</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Projects Module ─────────────────────────────────────────────
+function ProjectsModule() {
+  const active = manifest.projects.filter(p => p.status === "active");
+  const incubating = manifest.projects.filter(p => p.status !== "active");
 
   return (
     <div>
-      {/* Stats bar */}
-      <div style={{
-        display: "flex",
-        gap: 32,
-        marginBottom: 28,
-        animation: "fadeUp 0.4s ease both"
-      }}>
+      <div style={{ display: "flex", gap: "40px", marginBottom: "32px", animation: "fadeUp 0.4s ease both" }}>
         {[
           { label: "Total", value: manifest.projects.length },
           { label: "Active", value: active.length },
-          { label: "Incubating", value: other.length },
+          { label: "Incubating", value: incubating.length },
           { label: "In-Repo", value: manifest.projects.filter(p => p.migrated).length },
         ].map(stat => (
           <div key={stat.label}>
-            <div style={{
-              fontFamily: "var(--font-display)",
-              fontSize: 28,
-              color: "var(--color-navy)",
-              lineHeight: 1,
-            }}>{stat.value}</div>
-            <div style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 10,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-              color: "var(--color-muted)",
-              marginTop: 4
-            }}>{stat.label}</div>
+            <div style={{ fontFamily: F.display, fontSize: "32px", color: C.cream, lineHeight: 1 }}>{stat.value}</div>
+            <div style={{ fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: C.iron, marginTop: "4px" }}>{stat.label}</div>
           </div>
         ))}
       </div>
+      {manifest.projects.map((p, i) => <ProjectRow key={p.slug} project={p} index={i} />)}
+    </div>
+  );
+}
 
-      {/* Project list */}
-      <div>
-        {manifest.projects.map((p, i) => (
-          <ProjectRow key={p.slug} project={p} index={i} />
+// ─── Placeholder Module ──────────────────────────────────────────
+function PlaceholderModule({ description, items }) {
+  return (
+    <div style={{ animation: "fadeUp 0.4s ease both" }}>
+      <p style={{
+        fontFamily: F.body, fontSize: "15px", fontWeight: 300,
+        color: C.fog, marginBottom: "32px", maxWidth: "520px", lineHeight: 1.65,
+      }}>{description}</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "12px" }}>
+        {items.map((item, i) => (
+          <div key={i} style={{
+            border: `1px dashed ${C.slate}`, borderRadius: "6px", padding: "20px 18px",
+            animation: `fadeUp 0.4s ease ${0.06 * (i + 1)}s both`,
+            transition: "border-color 0.3s ease, background-color 0.3s ease",
+          }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.amber; e.currentTarget.style.backgroundColor = C.amberSubtle; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.slate; e.currentTarget.style.backgroundColor = "transparent"; }}
+          >
+            <div style={{ fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: C.amber, marginBottom: "8px" }}>{item.label}</div>
+            <div style={{ fontFamily: F.display, fontSize: "18px", color: C.cream, marginBottom: "4px" }}>{item.title}</div>
+            <div style={{ fontFamily: F.sans, fontSize: "12px", fontWeight: 300, color: C.iron, lineHeight: 1.5 }}>{item.desc}</div>
+          </div>
         ))}
       </div>
     </div>
   );
 }
 
-// -- Main App --
+// ═══════════════════════════════════════════════════════════════════
+// MAIN CONSOLE
+// ═══════════════════════════════════════════════════════════════════
 export default function BatcaveConsole() {
   const [activeModule, setActiveModule] = useState("projects");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
 
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); setCommandOpen(o => !o); }
+      if (e.key === "Escape") setCommandOpen(false);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   const modules = [
-    { id: "projects", label: "Projects", icon: Icons.projects },
-    { id: "agents", label: "Agents", icon: Icons.agents },
-    { id: "tasks", label: "Tasks", icon: Icons.tasks },
-    { id: "fitness", label: "Fitness", icon: Icons.fitness },
-    { id: "calendar", label: "Calendar", icon: Icons.calendar },
+    { id: "projects", label: "Projects", icon: I.workspace },
+    { id: "agents", label: "Agents", icon: I.agent },
+    { id: "tasks", label: "Tasks", icon: I.tasks },
+    { id: "fitness", label: "Fitness", icon: I.pulse },
+    { id: "calendar", label: "Calendar", icon: I.layers },
   ];
+
+  const moduleMeta = {
+    projects: { title: "Projects", mono: "System Registry", subtitle: `${manifest.projects.length} registered across the system` },
+    agents: { title: "Agents", mono: "Autonomous Systems", subtitle: "Build and manage autonomous workflows" },
+    tasks: { title: "Tasks", mono: "Personal Ops", subtitle: "Priority-driven task management" },
+    fitness: { title: "Fitness", mono: "Performance", subtitle: "Workouts, nutrition, recovery tracking" },
+    calendar: { title: "Calendar", mono: "Integrations", subtitle: "Unified calendar and email view" },
+  };
 
   const placeholders = {
     agents: {
-      description: "Build and manage autonomous agents that run scheduled code pushes, monitor repos, and execute workflows on your behalf.",
+      description: "Autonomous agents that run scheduled code pushes, monitor repos, and execute workflows. Governed through intent, not interruption.",
       items: [
-        { label: "Scheduled", title: "Code Deployer", desc: "Automated pushes on cron schedule" },
-        { label: "Monitor", title: "Repo Watcher", desc: "Track changes across downstream repos" },
-        { label: "Pipeline", title: "CI Orchestrator", desc: "Cross-package build coordination" },
-        { label: "Research", title: "Scout", desc: "Surface relevant signals from feeds" },
-      ]
+        { label: "Scheduled", title: "Code Deployer", desc: "Automated pushes on cron" },
+        { label: "Monitor", title: "Repo Watcher", desc: "Track downstream changes" },
+        { label: "Pipeline", title: "CI Orchestrator", desc: "Cross-package builds" },
+        { label: "Research", title: "Scout", desc: "Surface signals from feeds" },
+      ],
     },
     tasks: {
-      description: "Personal task list with priority levels, project tagging, and completion tracking.",
+      description: "Personal task list with priority levels, project tagging, and completion tracking. Capture fast, focus deep.",
       items: [
-        { label: "Inbox", title: "Capture", desc: "Quick-add tasks from anywhere" },
+        { label: "Inbox", title: "Capture", desc: "Quick-add from anywhere" },
         { label: "Active", title: "Focus Queue", desc: "Today's priority stack" },
-        { label: "Backlog", title: "Someday", desc: "Parked ideas and deferred work" },
-        { label: "Review", title: "Weekly Review", desc: "Reflect, reprioritize, archive" },
-      ]
+        { label: "Backlog", title: "Someday", desc: "Parked ideas, deferred work" },
+        { label: "Review", title: "Weekly Review", desc: "Reflect and reprioritize" },
+      ],
     },
     fitness: {
-      description: "Track workouts, nutrition, and recovery with weekly summaries and trend analysis.",
+      description: "Track workouts, nutrition, and recovery with weekly summaries and trend analysis. The body is infrastructure too.",
       items: [
-        { label: "Log", title: "Workout Log", desc: "Exercises, sets, reps, duration" },
+        { label: "Log", title: "Workout Log", desc: "Exercises, sets, duration" },
         { label: "Nutrition", title: "Fuel Tracker", desc: "Meals, macros, hydration" },
         { label: "Recovery", title: "Recovery Score", desc: "Sleep, soreness, readiness" },
-        { label: "Trends", title: "Progress", desc: "Weekly and monthly trend lines" },
-      ]
+        { label: "Trends", title: "Progress", desc: "Weekly and monthly trends" },
+      ],
     },
     calendar: {
-      description: "Unified view of calendar events and email threads, connected via Google Calendar and Gmail integrations.",
+      description: "Unified view of calendar events and email threads. Connected via Google Calendar and Gmail. Your morning brief, automated.",
       items: [
-        { label: "Today", title: "Daily Agenda", desc: "Meetings, blocks, and open time" },
-        { label: "Email", title: "Priority Inbox", desc: "Flagged threads and pending replies" },
+        { label: "Today", title: "Daily Agenda", desc: "Meetings, blocks, open time" },
+        { label: "Email", title: "Priority Inbox", desc: "Flagged threads, pending replies" },
         { label: "Week", title: "Week View", desc: "Availability and scheduling" },
         { label: "Digest", title: "Morning Brief", desc: "AI summary of upcoming day" },
-      ]
+      ],
     },
   };
 
-  const moduleTitle = {
-    projects: "Projects",
-    agents: "Agents",
-    tasks: "Tasks",
-    fitness: "Fitness",
-    calendar: "Calendar",
-  };
-
-  const moduleSubtitle = {
-    projects: `${manifest.projects.length} registered across the system`,
-    agents: "Autonomous workflows — coming soon",
-    tasks: "Personal task management — coming soon",
-    fitness: "Health and performance tracking — coming soon",
-    calendar: "Calendar and email integration — coming soon",
-  };
+  const meta = moduleMeta[activeModule];
 
   return (
     <div style={{
-      fontFamily: "var(--font-body)",
-      display: "flex",
-      height: "100vh",
-      background: "var(--color-cream)",
-      color: "var(--color-navy)",
-      overflow: "hidden",
+      fontFamily: F.sans, display: "flex", height: "100vh",
+      backgroundColor: C.obsidian, color: C.parchment, overflow: "hidden",
+      WebkitFontSmoothing: "antialiased",
     }}>
+      <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@300;400;500&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet" />
+
       <style>{`
-        :root {
-          --font-display: 'Instrument Serif', Georgia, serif;
-          --font-body: 'Source Sans 3', 'Source Sans Pro', system-ui, sans-serif;
-          --font-mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
-          --color-navy: #0a1628;
-          --color-navy-light: #1a2a44;
-          --color-navy-muted: #2a3a54;
-          --color-cream: #f5f0e8;
-          --color-cream-dark: #ebe5db;
-          --color-muted: #7a8494;
-          --color-border: rgba(10, 22, 40, 0.1);
-        }
-
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-
-        @keyframes slideIn {
-          from { opacity: 0; transform: translateX(-12px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-
-        /* Scrollbar */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        ::selection { background: ${C.amber}; color: ${C.obsidian}; }
+        input::placeholder { color: ${C.iron}; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes breathe { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(10, 22, 40, 0.15); border-radius: 2px; }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        ::-webkit-scrollbar-thumb { background: ${C.slate}; border-radius: 2px; }
+        button { font-family: inherit; }
       `}</style>
 
-      {/* Sidebar */}
+      {/* ── SIDEBAR ── */}
       <nav style={{
-        width: sidebarCollapsed ? 56 : 200,
-        background: "var(--color-navy)",
-        color: "var(--color-cream)",
-        display: "flex",
-        flexDirection: "column",
-        transition: "width 0.25s ease",
-        flexShrink: 0,
-        overflow: "hidden",
-        animation: mounted ? "fadeIn 0.5s ease" : "none",
+        width: collapsed ? 56 : 200, backgroundColor: C.cavern,
+        borderRight: `1px solid ${C.stone}`,
+        display: "flex", flexDirection: "column",
+        transition: "width 0.25s cubic-bezier(0.22,1,0.36,1)",
+        flexShrink: 0, overflow: "hidden",
+        animation: mounted ? "fadeIn 0.4s ease" : "none",
       }}>
-        {/* Logo */}
-        <div
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          style={{
-            padding: sidebarCollapsed ? "20px 16px" : "20px 20px",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            borderBottom: "1px solid rgba(245, 240, 232, 0.06)",
-          }}
-        >
-          <span style={{ flexShrink: 0, display: "flex", opacity: 0.9 }}>
-            {Icons.bat}
-          </span>
-          {!sidebarCollapsed && (
-            <span style={{
-              fontFamily: "var(--font-display)",
-              fontSize: 18,
-              whiteSpace: "nowrap",
-              letterSpacing: "-0.01em",
-            }}>
-              Batcave
-            </span>
+        <div onClick={() => setCollapsed(!collapsed)} style={{
+          padding: collapsed ? "18px 14px" : "18px 16px",
+          cursor: "pointer", display: "flex", alignItems: "center", gap: "10px",
+          borderBottom: `1px solid ${C.stone}`,
+        }}>
+          <div style={{ width: "28px", height: "28px", color: C.amber, flexShrink: 0 }}>{I.bat}</div>
+          {!collapsed && (
+            <span style={{ fontFamily: F.display, fontSize: "19px", color: C.cream, whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>Batcave</span>
           )}
         </div>
 
-        {/* Nav items */}
-        <div style={{ padding: "12px 0", flex: 1 }}>
-          {modules.map((mod, i) => {
-            const isActive = activeModule === mod.id;
-            return (
-              <button
-                key={mod.id}
-                onClick={() => setActiveModule(mod.id)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  width: "100%",
-                  padding: sidebarCollapsed ? "10px 19px" : "10px 20px",
-                  background: isActive ? "rgba(245, 240, 232, 0.08)" : "transparent",
-                  border: "none",
-                  borderRight: isActive ? "2px solid var(--color-cream)" : "2px solid transparent",
-                  color: isActive ? "var(--color-cream)" : "rgba(245, 240, 232, 0.45)",
-                  cursor: "pointer",
-                  fontFamily: "var(--font-body)",
-                  fontSize: 13,
-                  fontWeight: 400,
-                  letterSpacing: "0.01em",
-                  textAlign: "left",
-                  transition: "all 0.15s ease",
-                  animation: mounted ? `slideIn 0.3s ease ${0.05 * (i + 1)}s both` : "none",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) e.currentTarget.style.color = "rgba(245, 240, 232, 0.7)";
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) e.currentTarget.style.color = "rgba(245, 240, 232, 0.45)";
-                }}
-              >
-                <span style={{ flexShrink: 0, display: "flex" }}>{mod.icon}</span>
-                {!sidebarCollapsed && <span>{mod.label}</span>}
-              </button>
-            );
-          })}
+        <div style={{ padding: "8px 0", flex: 1 }}>
+          {modules.map((mod, i) => (
+            <div key={mod.id} style={{ animation: mounted ? `fadeUp 0.3s ease ${0.04 * (i + 1)}s both` : "none" }}>
+              <NavItem icon={mod.icon} label={mod.label} active={activeModule === mod.id} collapsed={collapsed} onClick={() => setActiveModule(mod.id)} />
+            </div>
+          ))}
+          <div style={{ height: "1px", backgroundColor: C.stone, margin: "8px 12px" }} />
+          <div style={{ animation: mounted ? "fadeUp 0.3s ease 0.3s both" : "none" }}>
+            <NavItem icon={I.settings} label="Settings" collapsed={collapsed} onClick={() => {}} />
+          </div>
         </div>
 
-        {/* Footer */}
-        {!sidebarCollapsed && (
-          <div style={{
-            padding: "16px 20px",
-            borderTop: "1px solid rgba(245, 240, 232, 0.06)",
-            fontFamily: "var(--font-mono)",
-            fontSize: 9,
-            color: "rgba(245, 240, 232, 0.25)",
-            letterSpacing: "0.04em",
-          }}>
-            v2.0.0 // dev
+        {!collapsed && (
+          <div onClick={() => setCommandOpen(true)} style={{
+            margin: "0 12px 12px", padding: "8px 12px", borderRadius: "6px",
+            backgroundColor: C.stone, cursor: "pointer",
+            display: "flex", alignItems: "center", gap: "8px",
+            transition: "background-color 0.2s ease",
+          }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = C.slate}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = C.stone}
+          >
+            <div style={{ width: "14px", height: "14px", color: C.iron }}>{I.search}</div>
+            <span style={{ fontFamily: F.sans, fontSize: "12px", color: C.iron, flex: 1 }}>Command</span>
+            <kbd style={{
+              fontFamily: F.mono, fontSize: "9px", color: C.iron,
+              padding: "1px 5px", borderRadius: "3px",
+              backgroundColor: C.cavern, border: `1px solid ${C.slate}`,
+            }}>K</kbd>
           </div>
+        )}
+
+        {!collapsed && (
+          <div style={{
+            padding: "12px 16px", borderTop: `1px solid ${C.stone}`,
+            fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em",
+          }}>v2.1 // batcave</div>
         )}
       </nav>
 
-      {/* Main */}
-      <main style={{
-        flex: 1,
-        overflow: "auto",
-        padding: "40px 48px",
-      }}>
-        {/* Page header */}
-        <div style={{
-          marginBottom: 32,
-          animation: "fadeUp 0.35s ease both",
-        }} key={activeModule}>
+      {/* ── MAIN ── */}
+      <main style={{ flex: 1, overflow: "auto", padding: "40px 48px" }}>
+        <div key={activeModule} style={{ marginBottom: "32px", animation: "fadeUp 0.35s ease both" }}>
           <div style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 10,
-            letterSpacing: "0.1em",
-            textTransform: "uppercase",
-            color: "var(--color-muted)",
-            marginBottom: 6,
-          }}>
-            {activeModule === "projects" ? "System Registry" :
-             activeModule === "agents" ? "Autonomous Systems" :
-             activeModule === "tasks" ? "Personal Ops" :
-             activeModule === "fitness" ? "Performance" :
-             "Integrations"}
-          </div>
+            fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.1em",
+            textTransform: "uppercase", color: C.amber, marginBottom: "8px",
+          }}>{meta.mono}</div>
           <h1 style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 36,
-            fontWeight: 400,
-            lineHeight: 1.15,
-            marginBottom: 4,
-          }}>
-            {moduleTitle[activeModule]}
-          </h1>
-          <p style={{
-            fontSize: 14,
-            fontWeight: 300,
-            color: "var(--color-muted)",
-          }}>
-            {moduleSubtitle[activeModule]}
-          </p>
+            fontFamily: F.display, fontSize: "38px", fontWeight: 300,
+            color: C.cream, lineHeight: 1.1, marginBottom: "6px", letterSpacing: "-0.01em",
+          }}>{meta.title}</h1>
+          <p style={{ fontFamily: F.body, fontSize: "15px", fontWeight: 300, color: C.iron }}>{meta.subtitle}</p>
         </div>
 
-        {/* Divider */}
         <div style={{
-          height: 1,
-          background: "var(--color-border)",
-          marginBottom: 28,
+          height: "1px", marginBottom: "28px",
+          background: `linear-gradient(to right, ${C.amber}40, ${C.stone}, transparent)`,
         }} />
 
-        {/* Content */}
-        <div key={activeModule}>
+        <div key={activeModule + "-content"}>
           {activeModule === "projects" && <ProjectsModule />}
           {activeModule !== "projects" && placeholders[activeModule] && (
-            <PlaceholderModule
-              title={moduleTitle[activeModule]}
-              description={placeholders[activeModule].description}
-              items={placeholders[activeModule].items}
-            />
+            <PlaceholderModule description={placeholders[activeModule].description} items={placeholders[activeModule].items} />
           )}
         </div>
       </main>
+
+      {commandOpen && <CommandBar onClose={() => setCommandOpen(false)} />}
     </div>
   );
 }
