@@ -6,11 +6,12 @@ import { createClient } from "@supabase/supabase-js";
 // ═══════════════════════════════════════════════════════════════════
 
 // ─── Supabase Client ─────────────────────────────────────────────
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
-const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-  : null;
+let supabase = null;
+const _supaUrl = import.meta.env.VITE_SUPABASE_URL || "";
+const _supaKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+if (_supaUrl && _supaKey) {
+  supabase = createClient(_supaUrl, _supaKey);
+}
 
 // ─── Auth Hook ───────────────────────────────────────────────────
 function useAuth() {
@@ -22,7 +23,7 @@ function useAuth() {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
@@ -30,16 +31,23 @@ function useAuth() {
   }, []);
 
   const signIn = async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return error;
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      return error;
+    } catch (e) {
+      return { message: e?.message || "Sign in failed" };
+    }
   };
 
   const signUp = async (email, password) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) return { error };
-    // If email confirmation is required, session will be null
-    const needsConfirmation = !data.session;
-    return { error: null, needsConfirmation };
+    try {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) return { error };
+      const needsConfirmation = !data.session;
+      return { error: null, needsConfirmation };
+    } catch (e) {
+      return { error: { message: e?.message || "Sign up failed" } };
+    }
   };
 
   const signOut = async () => {
@@ -350,20 +358,24 @@ function LoginScreen({ onLogin, isMobile }) {
     setError(null);
     setSuccess(null);
 
-    if (mode === "login") {
-      const err = await onLogin.signIn(email, password);
-      setLoading(false);
-      if (err) setError(err.message);
-    } else {
-      const result = await onLogin.signUp(email, password);
-      setLoading(false);
-      if (result.error) {
-        setError(result.error.message);
-      } else if (result.needsConfirmation) {
-        setSuccess("Account created. Check your email to confirm, then sign in.");
-        setMode("login");
+    try {
+      if (mode === "login") {
+        const err = await onLogin.signIn(email, password);
+        setLoading(false);
+        if (err) setError(err.message);
+      } else {
+        const result = await onLogin.signUp(email, password);
+        setLoading(false);
+        if (result && result.error) {
+          setError(result.error.message);
+        } else if (result && result.needsConfirmation) {
+          setSuccess("Account created. Check your email to confirm, then sign in.");
+          setMode("login");
+        }
       }
-      // If no confirmation needed, onAuthStateChange will pick up the session
+    } catch (e) {
+      setLoading(false);
+      setError("Error: " + (e?.message || String(e)));
     }
   };
 
@@ -454,6 +466,21 @@ function LoginScreen({ onLogin, isMobile }) {
               }}>
               {mode === "login" ? "Need an account? Sign up" : "Already have an account? Sign in"}
             </button>
+          </div>
+
+          {/* Debug info */}
+          <div style={{
+            marginTop: "20px", padding: "10px", borderRadius: "4px",
+            backgroundColor: C.obsidian, fontFamily: F.mono, fontSize: "9px",
+            color: C.slate, lineHeight: 1.8,
+          }}>
+            <div>supabase: {supabase ? "initialized" : "null"}</div>
+            <div>url: {_supaUrl ? _supaUrl.slice(0, 30) + "..." : "not set"}</div>
+            <div>key: {_supaKey ? _supaKey.slice(0, 8) + "..." : "not set"}</div>
+            <div>email: {email ? "has value" : "empty"}</div>
+            <div>password: {password ? "has value" : "empty"}</div>
+            <div>loading: {String(loading)}</div>
+            <div>mode: {mode}</div>
           </div>
         </div>
       </div>
