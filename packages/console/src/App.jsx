@@ -387,43 +387,103 @@ function LoginScreen({ onLogin, isMobile }) {
   };
 
   const inputStyle = {
-    width: "100%", background: C.obsidian, border: `1px solid ${C.slate}`,
-    borderRadius: "4px", padding: isMobile ? "14px" : "10px 14px",
+    width: "100%",
+    background: "rgba(17, 17, 21, 0.6)",
+    border: "1px solid rgba(60, 60, 80, 0.3)",
+    borderRadius: "8px", padding: isMobile ? "14px 16px" : "12px 16px",
     fontFamily: F.sans, fontSize: isMobile ? "16px" : "14px",
     color: C.parchment, outline: "none",
+    transition: "border-color 0.3s ease, box-shadow 0.3s ease",
   };
 
   return (
     <div style={{
-      minHeight: "100vh", backgroundColor: C.obsidian, display: "flex",
-      alignItems: "center", justifyContent: "center", padding: "20px",
+      minHeight: "100vh",
+      background: `linear-gradient(160deg, #080810 0%, #0c0c14 25%, #111118 50%, #0e0e16 75%, #0a0a12 100%)`,
+      display: "flex", alignItems: "center", justifyContent: "center", padding: "20px",
       fontFamily: F.sans, WebkitFontSmoothing: "antialiased",
+      position: "relative", overflow: "hidden",
     }}>
       <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@300;400;500&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet" />
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
         ::selection { background: ${C.amber}; color: ${C.obsidian}; }
         input::placeholder { color: ${C.iron}; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes loginOrb {
+          0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+          33% { transform: translate(10%, -5%) scale(1.1); opacity: 0.8; }
+          66% { transform: translate(-5%, 8%) scale(0.9); opacity: 0.5; }
+        }
+        @keyframes loginPulse {
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 0.6; }
+        }
       `}</style>
 
+      {/* Background orbs */}
       <div style={{
-        width: "100%", maxWidth: "360px",
-        animation: "fadeUp 0.5s cubic-bezier(0.22,1,0.36,1)",
-      }}>
-        <style>{`@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+        position: "absolute", top: "-20%", right: "-10%",
+        width: "60vw", height: "60vw", maxWidth: "600px", maxHeight: "600px",
+        borderRadius: "50%", pointerEvents: "none",
+        background: "radial-gradient(circle, rgba(123,143,163,0.1) 0%, rgba(123,143,163,0.03) 40%, transparent 65%)",
+        animation: "loginOrb 20s ease-in-out infinite",
+      }} />
+      <div style={{
+        position: "absolute", bottom: "-25%", left: "-15%",
+        width: "50vw", height: "50vw", maxWidth: "500px", maxHeight: "500px",
+        borderRadius: "50%", pointerEvents: "none",
+        background: "radial-gradient(circle, rgba(90,138,106,0.07) 0%, transparent 60%)",
+        animation: "loginOrb 25s ease-in-out infinite",
+        animationDelay: "-8s",
+      }} />
 
+      {/* Horizontal accent line */}
+      <div style={{
+        position: "absolute", top: "35%", left: 0, right: 0, height: "1px",
+        background: "linear-gradient(90deg, transparent, rgba(123,143,163,0.08), transparent)",
+        animation: "loginPulse 6s ease infinite",
+      }} />
+
+      <div style={{
+        width: "100%", maxWidth: "380px", position: "relative", zIndex: 1,
+        animation: "fadeUp 0.6s cubic-bezier(0.22,1,0.36,1)",
+      }}>
         {/* Logo */}
-        <div style={{ textAlign: "center", marginBottom: "40px" }}>
-          <div style={{ width: "48px", height: "48px", color: C.amber, margin: "0 auto 16px" }}>{I.bat}</div>
-          <div style={{ fontFamily: F.display, fontSize: "32px", color: C.cream, marginBottom: "6px" }}>Batcave</div>
-          <div style={{ fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: C.iron }}>Command Center</div>
+        <div style={{ textAlign: "center", marginBottom: "48px" }}>
+          <div style={{
+            width: "56px", height: "56px", color: C.amber, margin: "0 auto 20px",
+            filter: "drop-shadow(0 0 20px rgba(123,143,163,0.25))",
+            animation: "fadeUp 0.6s ease 0.1s both",
+          }}>{I.bat}</div>
+          <div style={{
+            fontFamily: F.display, fontSize: "38px", color: C.cream, marginBottom: "8px",
+            letterSpacing: "-0.02em", fontWeight: 300,
+            animation: "fadeUp 0.6s ease 0.2s both",
+          }}>Batcave</div>
+          <div style={{
+            fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.2em",
+            textTransform: "uppercase", color: C.iron,
+            animation: "fadeUp 0.6s ease 0.3s both",
+          }}>Command Center</div>
         </div>
 
         {/* Form */}
         <div style={{
-          backgroundColor: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "8px",
-          padding: isMobile ? "24px 20px" : "28px 24px",
+          background: "rgba(26, 26, 32, 0.5)",
+          backdropFilter: "blur(16px) saturate(120%)",
+          WebkitBackdropFilter: "blur(16px) saturate(120%)",
+          border: "1px solid rgba(60, 60, 80, 0.3)",
+          borderRadius: "12px",
+          padding: isMobile ? "28px 22px" : "32px 28px",
+          position: "relative", overflow: "hidden",
+          animation: "fadeUp 0.6s ease 0.35s both",
         }}>
+          {/* Top glow */}
+          <div style={{
+            position: "absolute", top: 0, left: "15%", right: "15%", height: "1px",
+            background: "linear-gradient(90deg, transparent, rgba(123,143,163,0.3), transparent)",
+          }} />
           <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "16px" }}>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)}
               placeholder="Email" style={inputStyle}
@@ -456,11 +516,16 @@ function LoginScreen({ onLogin, isMobile }) {
           )}
 
           <button onClick={handleSubmit} disabled={loading || !email || !password} style={{
-            width: "100%", background: C.amber, border: "none", borderRadius: "4px",
-            padding: isMobile ? "14px" : "10px",
-            fontFamily: F.mono, fontSize: "12px", fontWeight: 600, letterSpacing: "0.04em",
-            color: C.obsidian, cursor: "pointer",
-            opacity: loading || !email || !password ? 0.5 : 1,
+            width: "100%",
+            background: loading || !email || !password ? C.stone : `linear-gradient(135deg, ${C.amber}, ${C.embers})`,
+            border: "none", borderRadius: "8px",
+            padding: isMobile ? "14px" : "12px",
+            fontFamily: F.mono, fontSize: "11px", fontWeight: 600, letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: loading || !email || !password ? C.iron : C.obsidian,
+            cursor: loading || !email || !password ? "not-allowed" : "pointer",
+            transition: "all 0.3s ease",
+            boxShadow: loading || !email || !password ? "none" : "0 4px 20px rgba(123,143,163,0.15)",
           }}>
             {loading ? "..." : mode === "login" ? "Sign In" : "Create Account"}
           </button>
@@ -2708,7 +2773,7 @@ export default function BatcaveConsole() {
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.4 // batcave</span>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.5 // batcave</span>
           {auth.session && (
             <button onClick={auth.signOut} style={{
               background: "none", border: "none", cursor: "pointer",
@@ -2723,8 +2788,9 @@ export default function BatcaveConsole() {
   return (
     <div style={{
       fontFamily: F.sans, display: "flex", flexDirection: "column",
-      height: "100vh", backgroundColor: C.obsidian, color: C.parchment,
+      height: "100vh", color: C.parchment,
       overflow: "hidden", WebkitFontSmoothing: "antialiased",
+      background: `linear-gradient(145deg, #0c0c12 0%, ${C.obsidian} 30%, #10101a 60%, #0d0d15 100%)`,
     }}>
       {/* Fonts + viewport */}
       <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@300;400;500&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet" />
@@ -2737,18 +2803,17 @@ export default function BatcaveConsole() {
         @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes breathe { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+        @keyframes breathe { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
         @keyframes slideRight { from { transform: translateX(-100%); } to { transform: translateX(0); } }
 
-        /* Ambient pulse — the app is alive */
         @keyframes ambientShift {
-          0%, 100% { opacity: 0.3; transform: scale(1) translate(0, 0); }
-          33% { opacity: 0.5; transform: scale(1.1) translate(2%, -1%); }
-          66% { opacity: 0.35; transform: scale(0.95) translate(-1%, 2%); }
+          0%, 100% { opacity: 1; transform: scale(1) translate(0, 0); }
+          33% { opacity: 0.8; transform: scale(1.15) translate(3%, -2%); }
+          66% { opacity: 0.9; transform: scale(0.9) translate(-2%, 3%); }
         }
         @keyframes glowPulse {
           0%, 100% { box-shadow: 0 0 0 0 rgba(123,143,163,0); }
-          50% { box-shadow: 0 0 20px 2px rgba(123,143,163,0.08); }
+          50% { box-shadow: 0 0 24px 4px rgba(123,143,163,0.12); }
         }
         @keyframes borderFlow {
           0% { background-position: 0% 50%; }
@@ -2757,39 +2822,52 @@ export default function BatcaveConsole() {
         }
         @keyframes gentleDrift {
           0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-3px); }
+          50% { transform: translateY(-4px); }
         }
         @keyframes typeReveal {
-          from { opacity: 0; transform: translateY(4px); filter: blur(2px); }
+          from { opacity: 0; transform: translateY(6px); filter: blur(3px); }
           to { opacity: 1; transform: translateY(0); filter: blur(0); }
         }
-
-        /* Grain overlay */
-        .batcave-grain::after {
-          content: '';
-          position: fixed;
-          top: -50%;
-          left: -50%;
-          right: -50%;
-          bottom: -50%;
-          width: 200%;
-          height: 200%;
-          background: transparent url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E") repeat;
-          pointer-events: none;
-          z-index: 9999;
-          opacity: 0.6;
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        @keyframes orbFloat {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          25% { transform: translate(5%, -3%) scale(1.05); }
+          50% { transform: translate(-2%, 5%) scale(0.95); }
+          75% { transform: translate(-4%, -2%) scale(1.02); }
         }
 
-        /* Ambient orb — subtle background glow */
-        .batcave-ambient {
-          position: fixed;
-          width: 600px;
-          height: 600px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(123,143,163,0.04) 0%, transparent 70%);
-          animation: ambientShift 20s ease-in-out infinite;
+        /* Glass card base */
+        .bc-glass {
+          background: rgba(26, 26, 32, 0.6);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid rgba(60, 60, 80, 0.3);
+          border-radius: 10px;
+        }
+        .bc-glass:hover {
+          border-color: rgba(123, 143, 163, 0.2);
+        }
+
+        /* Animated border */
+        .bc-glow-border {
+          position: relative;
+        }
+        .bc-glow-border::before {
+          content: '';
+          position: absolute;
+          inset: -1px;
+          border-radius: inherit;
+          padding: 1px;
+          background: linear-gradient(135deg, rgba(123,143,163,0.15), transparent, rgba(123,143,163,0.08));
+          background-size: 200% 200%;
+          animation: borderFlow 8s ease infinite;
+          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
           pointer-events: none;
-          z-index: 0;
         }
 
         ::-webkit-scrollbar { width: 3px; }
@@ -2798,16 +2876,34 @@ export default function BatcaveConsole() {
         ::-webkit-scrollbar-thumb:hover { background: ${C.iron}; }
         button { font-family: inherit; }
         html { -webkit-text-size-adjust: 100%; }
-
-        /* Refined focus states */
         input:focus { border-color: ${C.amber} !important; }
         select:focus { border-color: ${C.amber} !important; }
       `}</style>
 
-      {/* Ambient background orbs */}
-      <div className="batcave-ambient" style={{ top: "-200px", right: "-200px" }} />
-      <div className="batcave-ambient" style={{ bottom: "-300px", left: "-100px", animationDelay: "-7s", width: "400px", height: "400px" }} />
-      <div className="batcave-grain" />
+      {/* Atmospheric orbs — actually visible */}
+      <div style={{
+        position: "fixed", top: "-15%", right: "-10%",
+        width: "50vw", height: "50vw", maxWidth: "700px", maxHeight: "700px",
+        borderRadius: "50%", pointerEvents: "none", zIndex: 0,
+        background: "radial-gradient(circle, rgba(123,143,163,0.08) 0%, rgba(123,143,163,0.03) 40%, transparent 70%)",
+        animation: "orbFloat 25s ease-in-out infinite",
+      }} />
+      <div style={{
+        position: "fixed", bottom: "-20%", left: "-5%",
+        width: "40vw", height: "40vw", maxWidth: "500px", maxHeight: "500px",
+        borderRadius: "50%", pointerEvents: "none", zIndex: 0,
+        background: "radial-gradient(circle, rgba(90,138,106,0.06) 0%, rgba(90,138,106,0.02) 40%, transparent 70%)",
+        animation: "orbFloat 30s ease-in-out infinite",
+        animationDelay: "-10s",
+      }} />
+      <div style={{
+        position: "fixed", top: "40%", left: "30%",
+        width: "30vw", height: "30vw", maxWidth: "400px", maxHeight: "400px",
+        borderRadius: "50%", pointerEvents: "none", zIndex: 0,
+        background: "radial-gradient(circle, rgba(184,144,64,0.04) 0%, transparent 60%)",
+        animation: "orbFloat 35s ease-in-out infinite",
+        animationDelay: "-18s",
+      }} />
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
 
@@ -2815,8 +2911,11 @@ export default function BatcaveConsole() {
         {isMobile && (
           <div style={{
             position: "fixed", top: 0, left: 0, right: 0, zIndex: 50,
-            height: "56px", backgroundColor: C.cavern,
-            borderBottom: `1px solid ${C.stone}`,
+            height: "56px",
+            background: "rgba(26, 26, 32, 0.75)",
+            backdropFilter: "blur(20px) saturate(130%)",
+            WebkitBackdropFilter: "blur(20px) saturate(130%)",
+            borderBottom: "1px solid rgba(60, 60, 80, 0.25)",
             display: "flex", alignItems: "center", padding: "0 16px", gap: "12px",
           }}>
             {/* Hamburger */}
@@ -2859,17 +2958,23 @@ export default function BatcaveConsole() {
           drawerOpen && (
             <nav style={{
               position: "fixed", top: 0, left: 0, bottom: 0, width: "280px",
-              backgroundColor: C.cavern, zIndex: 101,
+              background: "rgba(22, 22, 28, 0.85)",
+              backdropFilter: "blur(24px) saturate(130%)",
+              WebkitBackdropFilter: "blur(24px) saturate(130%)",
+              zIndex: 101,
               display: "flex", flexDirection: "column",
               animation: "slideRight 0.25s cubic-bezier(0.22,1,0.36,1)",
-              borderRight: `1px solid ${C.stone}`,
+              borderRight: "1px solid rgba(60, 60, 80, 0.3)",
             }}>
               {/* Drawer header */}
               <div style={{
                 padding: "14px 16px", display: "flex", alignItems: "center",
-                gap: "10px", borderBottom: `1px solid ${C.stone}`,
+                gap: "10px", borderBottom: "1px solid rgba(60, 60, 80, 0.25)",
               }}>
-                <div style={{ width: "28px", height: "28px", color: C.amber, flexShrink: 0 }}>{I.bat}</div>
+                <div style={{
+                  width: "28px", height: "28px", color: C.amber, flexShrink: 0,
+                  filter: "drop-shadow(0 0 8px rgba(123,143,163,0.3))",
+                }}>{I.bat}</div>
                 <span style={{ fontFamily: F.display, fontSize: "19px", color: C.cream, flex: 1 }}>Batcave</span>
                 <button onClick={() => setDrawerOpen(false)} style={{
                   background: "none", border: "none", cursor: "pointer",
@@ -2885,20 +2990,23 @@ export default function BatcaveConsole() {
         ) : (
           // Desktop sidebar
           <nav style={{
-            width: collapsed ? 56 : 200, backgroundColor: C.cavern,
-            borderRight: `1px solid ${C.stone}`,
+            width: collapsed ? 56 : 200,
+            background: "rgba(22, 22, 28, 0.7)",
+            backdropFilter: "blur(16px) saturate(120%)",
+            WebkitBackdropFilter: "blur(16px) saturate(120%)",
+            borderRight: "1px solid rgba(60, 60, 80, 0.25)",
             display: "flex", flexDirection: "column",
             transition: "width 0.25s cubic-bezier(0.22,1,0.36,1)",
             flexShrink: 0, overflow: "hidden",
             animation: mounted ? "fadeIn 0.4s ease" : "none",
             position: "relative",
           }}>
-            {/* Sidebar ambient */}
+            {/* Sidebar ambient glow */}
             <div style={{
-              position: "absolute", top: "-20px", left: "-20px",
-              width: "120px", height: "120px", borderRadius: "50%",
-              background: `radial-gradient(circle, ${C.amberGlow} 0%, transparent 70%)`,
-              animation: "ambientShift 18s ease-in-out infinite",
+              position: "absolute", top: "-30px", left: "-30px",
+              width: "160px", height: "160px", borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(123,143,163,0.12) 0%, transparent 70%)",
+              animation: "orbFloat 20s ease-in-out infinite",
               pointerEvents: "none", zIndex: 0,
             }} />
             <div onClick={() => setCollapsed(!collapsed)} style={{
