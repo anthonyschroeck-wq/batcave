@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import BrandKit from "./BrandKit";
 
 // -- Manifest data (Phase 2: fetch from GitHub API) --
 const manifest = {
@@ -55,13 +54,6 @@ const Icons = {
   chevron: (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
       <path d="M9 18l6-6-6-6" />
-    </svg>
-  ),
-  brandkit: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2L2 7l10 5 10-5-10-5z" />
-      <path d="M2 17l10 5 10-5" />
-      <path d="M2 12l10 5 10-5" />
     </svg>
   ),
   bat: (
@@ -306,7 +298,6 @@ export default function BatcaveConsole() {
     { id: "tasks", label: "Tasks", icon: Icons.tasks },
     { id: "fitness", label: "Fitness", icon: Icons.fitness },
     { id: "calendar", label: "Calendar", icon: Icons.calendar },
-    { id: "brandkit", label: "Brand Kit", icon: Icons.brandkit },
   ];
 
   const placeholders = {
@@ -354,7 +345,6 @@ export default function BatcaveConsole() {
     tasks: "Tasks",
     fitness: "Fitness",
     calendar: "Calendar",
-    brandkit: "Brand Kit",
   };
 
   const moduleSubtitle = {
@@ -363,7 +353,6 @@ export default function BatcaveConsole() {
     tasks: "Personal task management — coming soon",
     fitness: "Health and performance tracking — coming soon",
     calendar: "Calendar and email integration — coming soon",
-    brandkit: "Batcave design system and brand guidelines",
   };
 
   return (
@@ -511,12 +500,8 @@ export default function BatcaveConsole() {
       <main style={{
         flex: 1,
         overflow: "auto",
-        padding: activeModule === "brandkit" ? 0 : "40px 48px",
+        padding: "40px 48px",
       }}>
-        {activeModule === "brandkit" ? (
-          <BrandKit />
-        ) : (
-        <>
         {/* Page header */}
         <div style={{
           marginBottom: 32,
@@ -572,8 +557,6 @@ export default function BatcaveConsole() {
             />
           )}
         </div>
-        </>
-        )}
       </main>
     </div>
   );
