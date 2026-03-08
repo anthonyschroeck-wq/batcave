@@ -1333,21 +1333,6 @@ export default function BatcaveConsole() {
 
   useEffect(() => { setMounted(true); }, []);
 
-  // Auth gate
-  if (auth.loading) {
-    return (
-      <div style={{ minHeight: "100vh", backgroundColor: C.obsidian, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ fontFamily: F.mono, fontSize: "12px", color: C.iron }}>Loading...</div>
-      </div>
-    );
-  }
-
-  if (!auth.session && supabase) {
-    return <LoginScreen onLogin={auth} isMobile={isMobile} />;
-  }
-
-  useEffect(() => { setMounted(true); }, []);
-
   // Close drawer on resize to desktop
   useEffect(() => {
     if (!isMobile) setDrawerOpen(false);
@@ -1367,6 +1352,19 @@ export default function BatcaveConsole() {
     setActiveModule(id);
     if (isMobile) setDrawerOpen(false);
   }, [isMobile]);
+
+  // Auth gate — AFTER all hooks
+  if (auth.loading) {
+    return (
+      <div style={{ minHeight: "100vh", backgroundColor: C.obsidian, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontFamily: F.mono, fontSize: "12px", color: C.iron }}>Loading...</div>
+      </div>
+    );
+  }
+
+  if (!auth.session && supabase) {
+    return <LoginScreen onLogin={auth} isMobile={isMobile} />;
+  }
 
   const modules = [
     { id: "home", label: "Home", icon: I.home },
