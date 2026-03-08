@@ -830,11 +830,30 @@ function ProjectsModule({ isMobile, liveData }) {
 }
 
 // ─── Homepage Module ─────────────────────────────────────────────
-function HomepageModule({ isMobile }) {
+function HomepageModule({ isMobile, session }) {
   const [markets, setMarkets] = useState(null);
   const [news, setNews] = useState(null);
+  const [brief, setBrief] = useState(null);
+  const [briefLoading, setBriefLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const headers = session?.access_token
+    ? { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }
+    : { "Content-Type": "application/json" };
+
+  const fetchBrief = useCallback(async (forceNew) => {
+    setBriefLoading(true);
+    try {
+      if (!forceNew) {
+        const cached = await fetch("/api/brief").then(r => r.ok ? r.json() : null).catch(() => null);
+        if (cached?.brief) { setBrief(cached.brief); setBriefLoading(false); return; }
+      }
+      const gen = await fetch("/api/brief", { method: "POST", headers }).then(r => r.ok ? r.json() : null).catch(() => null);
+      if (gen?.brief) setBrief(gen.brief);
+    } catch {}
+    setBriefLoading(false);
+  }, [session]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -853,7 +872,7 @@ function HomepageModule({ isMobile }) {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchData(); fetchBrief(false); }, [fetchData, fetchBrief]);
 
   const formatTime = (unix) => {
     if (!unix) return "";
@@ -867,6 +886,52 @@ function HomepageModule({ isMobile }) {
 
   return (
     <div style={{ animation: "fadeUp 0.4s ease both" }}>
+
+      {/* AI Briefing */}
+      <div style={{ marginBottom: "32px" }}>
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px",
+        }}>
+          <div style={{
+            fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.08em",
+            textTransform: "uppercase", color: C.amber,
+          }}>Daily Briefing</div>
+          <button onClick={() => fetchBrief(true)} disabled={briefLoading} style={{
+            background: "none", border: `1px solid ${C.slate}`, borderRadius: "3px",
+            padding: isMobile ? "6px 12px" : "2px 8px",
+            fontFamily: F.mono, fontSize: "10px", color: C.amber,
+            cursor: "pointer", minHeight: isMobile ? "32px" : undefined,
+            opacity: briefLoading ? 0.5 : 1,
+          }}>{briefLoading ? "generating..." : brief ? "regenerate" : "generate"}</button>
+        </div>
+
+        {brief?.content ? (
+          <div style={{
+            backgroundColor: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
+            padding: isMobile ? "18px 16px" : "22px 24px",
+          }}>
+            <div style={{
+              fontFamily: F.body, fontSize: "14px", color: C.fog, lineHeight: 1.75,
+              whiteSpace: "pre-wrap",
+            }}>{brief.content}</div>
+            {brief.tokens_used && (
+              <div style={{
+                fontFamily: F.mono, fontSize: "9px", color: C.slate, marginTop: "12px",
+                borderTop: `1px solid ${C.stone}`, paddingTop: "8px",
+              }}>{brief.tokens_used} tokens / {brief.brief_date}</div>
+            )}
+          </div>
+        ) : !briefLoading ? (
+          <div style={{
+            backgroundColor: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
+            padding: isMobile ? "18px 16px" : "22px 24px", textAlign: "center",
+          }}>
+            <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.iron, lineHeight: 1.6 }}>
+              Connect Anthropic in Integrations, then tap generate for your AI briefing.
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       {/* Market Indices */}
       <div style={{ marginBottom: "32px" }}>
@@ -1288,6 +1353,121 @@ function IntegrationsModule({ isMobile, liveData, session }) {
           color: C.amber, cursor: "pointer", minHeight: isMobile ? "44px" : undefined,
         }}>{loading ? "checking..." : "refresh status"}</button>
       </div>
+
+      {/* Usage Monitor */}
+      <UsageMonitor isMobile={isMobile} session={session} />
+    </div>
+  );
+}
+
+// ─── Usage Monitor ──────────────────────────────────────────────
+function UsageMonitor({ isMobile, session }) {
+  const [usage, setUsage] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchUsage = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/usage");
+      if (res.ok) setUsage(await res.json());
+    } catch {}
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchUsage(); }, [fetchUsage]);
+
+  if (!usage && !loading) return null;
+
+  const fmt = (cents) => "$" + (cents / 100).toFixed(2);
+  const fmtTokens = (n) => n > 1000000 ? (n / 1000000).toFixed(1) + "M" : n > 1000 ? (n / 1000).toFixed(1) + "K" : String(n);
+
+  return (
+    <div style={{ marginTop: "32px" }}>
+      <div style={{
+        fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.08em",
+        textTransform: "uppercase", color: C.amber, marginBottom: "16px",
+      }}>AI Usage</div>
+
+      {loading && <div style={{ fontFamily: F.mono, fontSize: "12px", color: C.iron }}>Loading usage data...</div>}
+
+      {usage && (
+        <>
+          {/* Monthly summary */}
+          <div style={{
+            display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)",
+            gap: "12px", marginBottom: "20px",
+          }}>
+            {[
+              { label: "Month Cost", value: fmt(usage.month.costCents), color: C.cream },
+              { label: "Today", value: fmt(usage.today.costCents), color: C.fog },
+              { label: "API Calls", value: String(usage.month.calls), color: C.fog },
+              { label: "Tokens", value: fmtTokens(usage.month.inputTokens + usage.month.outputTokens), color: C.fog },
+            ].map(s => (
+              <div key={s.label} style={{
+                backgroundColor: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
+                padding: isMobile ? "14px" : "14px 16px",
+              }}>
+                <div style={{ fontFamily: F.display, fontSize: isMobile ? "22px" : "24px", color: s.color }}>{s.value}</div>
+                <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, marginTop: "4px", letterSpacing: "0.06em", textTransform: "uppercase" }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* By endpoint */}
+          {Object.keys(usage.byEndpoint || {}).length > 0 && (
+            <div style={{
+              backgroundColor: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
+              padding: isMobile ? "14px" : "16px 20px", marginBottom: "16px",
+            }}>
+              <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, marginBottom: "10px", letterSpacing: "0.06em", textTransform: "uppercase" }}>By Endpoint</div>
+              {Object.entries(usage.byEndpoint).map(([ep, stats]) => (
+                <div key={ep} style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "6px 0", borderBottom: `1px solid ${C.stone}`,
+                  fontFamily: F.mono, fontSize: "11px",
+                }}>
+                  <span style={{ color: C.parchment }}>{ep}</span>
+                  <div style={{ display: "flex", gap: "16px", color: C.iron }}>
+                    <span>{stats.calls} calls</span>
+                    <span>{fmtTokens(stats.inputTokens + stats.outputTokens)} tok</span>
+                    <span style={{ color: C.fog }}>{fmt(stats.costCents)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Recent calls */}
+          {usage.recent?.length > 0 && (
+            <div style={{
+              backgroundColor: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
+              padding: isMobile ? "14px" : "16px 20px",
+            }}>
+              <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, marginBottom: "10px", letterSpacing: "0.06em", textTransform: "uppercase" }}>Recent Calls</div>
+              {usage.recent.slice(0, 10).map((u, i) => (
+                <div key={i} style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "5px 0", borderBottom: `1px solid ${C.stone}`,
+                  fontFamily: F.mono, fontSize: "10px",
+                }}>
+                  <span style={{ color: C.amber }}>{u.endpoint}</span>
+                  <div style={{ display: "flex", gap: "12px", color: C.iron }}>
+                    <span>{u.inputTokens + u.outputTokens} tok</span>
+                    <span>{fmt(u.costCents)}</span>
+                    <span>{new Date(u.time).toLocaleTimeString()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button onClick={fetchUsage} style={{
+            marginTop: "12px", background: "none", border: `1px solid ${C.slate}`, borderRadius: "4px",
+            padding: isMobile ? "8px 14px" : "4px 10px", fontFamily: F.mono, fontSize: "10px",
+            color: C.iron, cursor: "pointer",
+          }}>refresh usage</button>
+        </>
+      )}
     </div>
   );
 }
@@ -1577,7 +1757,19 @@ function ChatShell({ isMobile, session, liveData }) {
       });
       const data = await res.json();
       if (res.ok) {
-        setMessages(prev => [...prev, { role: "assistant", text: data.response }]);
+        let responseText = data.response || "";
+        // Show action results
+        if (data.actions?.length > 0) {
+          const actionSummary = data.actions.map(a =>
+            a.ok ? `  [ok] ${a.action}` : `  [fail] ${a.action}: ${a.error}`
+          ).join("\n");
+          responseText += `\n\n--- actions executed ---\n${actionSummary}`;
+        }
+        // Show token usage
+        if (data.usage) {
+          responseText += `\n\n[${data.usage.input_tokens + data.usage.output_tokens} tokens]`;
+        }
+        setMessages(prev => [...prev, { role: "assistant", text: responseText }]);
       } else {
         setMessages(prev => [...prev, { role: "error", text: data.error || "Request failed" }]);
       }
@@ -2187,7 +2379,7 @@ export default function BatcaveConsole() {
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.1 // batcave</span>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.2 // batcave</span>
           {auth.session && (
             <button onClick={auth.signOut} style={{
               background: "none", border: "none", cursor: "pointer",
@@ -2346,7 +2538,7 @@ export default function BatcaveConsole() {
           }} />
 
           <div key={activeModule + "-content"}>
-            {activeModule === "home" && <HomepageModule isMobile={isMobile} />}
+            {activeModule === "home" && <HomepageModule isMobile={isMobile} session={auth.session} />}
             {activeModule === "command" && <ChatShell isMobile={isMobile} session={auth.session} liveData={liveData} />}
             {activeModule === "tasks" && <TasksModule isMobile={isMobile} session={auth.session} />}
             {activeModule === "calendar" && <CalendarModule isMobile={isMobile} session={auth.session} />}
