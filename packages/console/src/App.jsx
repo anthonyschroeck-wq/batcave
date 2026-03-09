@@ -257,6 +257,11 @@ const I = {
       <circle cx="12" cy="12" r="2" /><path d="M12 8v2" /><path d="M12 14v2" /><path d="M8 12h2" /><path d="M14 12h2" />
     </svg>
   ),
+  bell: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </svg>
+  ),
   workspace: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
@@ -625,10 +630,10 @@ function CommandBar({ onClose, isMobile, session, onAction }) {
             color: loading ? C.caution : C.amber,
             filter: loading ? "none" : "drop-shadow(0 0 10px rgba(123,143,163,0.5))",
             transition: "filter 0.3s ease",
-          }}>{I.command}</div>
+          }}>{I.bell}</div>
           <input ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === "Enter" && send()}
-            placeholder={connected ? "Ask anything, create tasks, manage events..." : "Connect Anthropic key in Integrations"}
+            placeholder={connected ? "Alfred... tasks, events, projects, anything" : "Connect Anthropic key in Integrations"}
             disabled={!connected}
             style={{
               flex: 1, background: "none", border: "none", outline: "none",
@@ -990,8 +995,8 @@ function ProjectsModule({ isMobile, liveData }) {
 }
 
 // ─── Homepage Module ─────────────────────────────────────────────
-// ─── Quick Command (inline, for Home page) ──────────────────────
-function QuickCommand({ isMobile, session, triggerRefresh }) {
+// ─── Alfred (inline AI, for Home page) ─────────────────────────
+function Alfred({ isMobile, session, triggerRefresh }) {
   const [input, setInput] = useState("");
   const [response, setResponse] = useState(null);
   const [actions, setActions] = useState([]);
@@ -1044,10 +1049,10 @@ function QuickCommand({ isMobile, session, triggerRefresh }) {
           padding: isMobile ? "10px 14px" : "8px 14px",
           transition: "border-color 0.2s ease",
         }}>
-          <div style={{ width: "16px", height: "16px", color: C.iron, flexShrink: 0 }}>{I.command}</div>
+          <div style={{ width: "16px", height: "16px", color: C.iron, flexShrink: 0 }}>{I.bell}</div>
           <input value={input} onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === "Enter" && send()}
-            placeholder={connected ? "Quick command... add task, schedule event, ask anything" : "Connect Anthropic in Integrations"}
+            placeholder={connected ? "Alfred... add task, schedule event, ask anything" : "Connect Anthropic in Integrations"}
             disabled={!connected}
             style={{
               flex: 1, background: "none", border: "none", outline: "none",
@@ -1104,6 +1109,66 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
   const [briefLoading, setBriefLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [time, setTime] = useState(new Date());
+  const [editClocks, setEditClocks] = useState(false);
+  const [editTickers, setEditTickers] = useState(false);
+
+  // Configurable widgets — persisted to localStorage
+  const CLOCK_CATALOG = [
+    { label: "Nashville", tz: "America/Chicago", abbr: "CT" },
+    { label: "New York", tz: "America/New_York", abbr: "ET" },
+    { label: "Los Angeles", tz: "America/Los_Angeles", abbr: "PT" },
+    { label: "Seattle", tz: "America/Los_Angeles", abbr: "PT" },
+    { label: "Denver", tz: "America/Denver", abbr: "MT" },
+    { label: "London", tz: "Europe/London", abbr: "GMT" },
+    { label: "Paris", tz: "Europe/Paris", abbr: "CET" },
+    { label: "Berlin", tz: "Europe/Berlin", abbr: "CET" },
+    { label: "Dubai", tz: "Asia/Dubai", abbr: "GST" },
+    { label: "Mumbai", tz: "Asia/Kolkata", abbr: "IST" },
+    { label: "Tokyo", tz: "Asia/Tokyo", abbr: "JST" },
+    { label: "Singapore", tz: "Asia/Singapore", abbr: "SGT" },
+    { label: "Sydney", tz: "Australia/Sydney", abbr: "AEST" },
+    { label: "Honolulu", tz: "Pacific/Honolulu", abbr: "HST" },
+  ];
+
+  const TICKER_CATALOG = [
+    { symbol: "SPY", label: "S&P 500" },
+    { symbol: "QQQ", label: "NASDAQ" },
+    { symbol: "DIA", label: "DOW" },
+    { symbol: "IWM", label: "Russell 2K" },
+    { symbol: "AAPL", label: "Apple" },
+    { symbol: "MSFT", label: "Microsoft" },
+    { symbol: "GOOGL", label: "Google" },
+    { symbol: "AMZN", label: "Amazon" },
+    { symbol: "NVDA", label: "NVIDIA" },
+    { symbol: "TSLA", label: "Tesla" },
+    { symbol: "BTC-USD", label: "Bitcoin" },
+    { symbol: "GLD", label: "Gold" },
+  ];
+
+  const defaultClocks = ["America/Chicago", "America/New_York", "America/Los_Angeles", "Europe/London"];
+  const defaultTickers = ["SPY", "QQQ", "DIA"];
+
+  const loadSetting = (key, fallback) => {
+    try { const v = window.localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+  };
+  const saveSetting = (key, val) => {
+    try { window.localStorage.setItem(key, JSON.stringify(val)); } catch {}
+  };
+
+  const [activeClocks, setActiveClocks] = useState(() => loadSetting("bc_clocks", defaultClocks));
+  const [activeTickers, setActiveTickers] = useState(() => loadSetting("bc_tickers", defaultTickers));
+
+  const toggleClock = (tz) => {
+    const next = activeClocks.includes(tz) ? activeClocks.filter(t => t !== tz) : [...activeClocks, tz];
+    setActiveClocks(next);
+    saveSetting("bc_clocks", next);
+  };
+
+  const toggleTicker = (sym) => {
+    const next = activeTickers.includes(sym) ? activeTickers.filter(s => s !== sym) : [...activeTickers, sym];
+    setActiveTickers(next);
+    saveSetting("bc_tickers", next);
+  };
 
   const headers = session?.access_token
     ? { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }
@@ -1134,68 +1199,132 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
   useEffect(() => { fetchMarkets(); fetchBrief(false); }, [fetchMarkets, fetchBrief]);
   useEffect(() => { const t = setInterval(() => setTime(new Date()), 30000); return () => clearInterval(t); }, []);
 
-  const clocks = [
-    { label: "Nashville", tz: "America/Chicago", abbr: "CT" },
-    { label: "New York", tz: "America/New_York", abbr: "ET" },
-    { label: "Seattle", tz: "America/Los_Angeles", abbr: "PT" },
-    { label: "London", tz: "Europe/London", abbr: "GMT" },
-  ];
+  const clockData = CLOCK_CATALOG.filter(c => activeClocks.includes(c.tz));
   const getTimeIn = (tz) => { try { return time.toLocaleTimeString("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit", hour12: true }); } catch { return "--"; } };
 
   return (
     <div style={{ animation: "fadeUp 0.4s ease both" }}>
-      {/* Quick Command — front and center */}
+      {/* Alfred — front and center */}
       <div style={{ marginBottom: "24px" }}>
-        <QuickCommand isMobile={isMobile} session={session} triggerRefresh={triggerRefresh} />
+        <Alfred isMobile={isMobile} session={session} triggerRefresh={triggerRefresh} />
       </div>
 
       {/* Clocks + Compact Tickers */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "14px", marginBottom: "24px" }}>
-        {/* World Clocks */}
+        {/* World Clocks Widget */}
         <div style={{
           background: "rgba(22,22,32,0.4)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
           border: "1px solid rgba(70,70,90,0.25)", borderRadius: "10px",
           padding: isMobile ? "16px" : "18px 20px",
           boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
         }}>
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${isMobile ? 2 : clocks.length}, 1fr)`, gap: isMobile ? "16px" : "8px" }}>
-            {clocks.map((c, i) => (
-              <div key={c.tz} style={{ textAlign: "center", animation: `typeReveal 0.3s ease ${0.06 * i}s both` }}>
-                <div style={{ fontFamily: F.display, fontSize: isMobile ? "24px" : "22px", color: i === 0 ? C.cream : C.fog, fontWeight: 300, lineHeight: 1.2 }}>{getTimeIn(c.tz)}</div>
-                <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, letterSpacing: "0.06em", marginTop: "4px" }}>{c.label}</div>
-                <div style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate }}>{c.abbr}</div>
-              </div>
-            ))}
+          {/* Widget header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+            <span style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate, letterSpacing: "0.08em", textTransform: "uppercase" }}>Clocks</span>
+            <button onClick={() => setEditClocks(!editClocks)} style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontFamily: F.mono, fontSize: "8px", color: editClocks ? C.amber : C.slate,
+              letterSpacing: "0.04em",
+            }}>{editClocks ? "done" : "edit"}</button>
           </div>
-        </div>
 
-        {/* Compact Tickers */}
-        <div style={{
-          background: "rgba(22,22,32,0.4)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-          border: "1px solid rgba(70,70,90,0.25)", borderRadius: "10px",
-          padding: isMobile ? "16px" : "18px 20px",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
-        }}>
-          {markets?.indices ? (
-            <div style={{ display: "grid", gridTemplateColumns: `repeat(${markets.indices.length}, 1fr)`, gap: "8px" }}>
-              {markets.indices.map((idx, i) => {
-                const up = idx.change >= 0;
+          {/* Clock display */}
+          {!editClocks ? (
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: `repeat(${isMobile ? Math.min(clockData.length, 2) : Math.min(clockData.length, 4)}, 1fr)`,
+              gap: isMobile ? "16px" : "8px",
+            }}>
+              {clockData.map((c, i) => (
+                <div key={c.tz} style={{ textAlign: "center", animation: `typeReveal 0.3s ease ${0.06 * i}s both` }}>
+                  <div style={{ fontFamily: F.display, fontSize: isMobile ? "24px" : "22px", color: i === 0 ? C.cream : C.fog, fontWeight: 300, lineHeight: 1.2 }}>{getTimeIn(c.tz)}</div>
+                  <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, letterSpacing: "0.06em", marginTop: "4px" }}>{c.label}</div>
+                  <div style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate }}>{c.abbr}</div>
+                </div>
+              ))}
+              {clockData.length === 0 && <div style={{ fontFamily: F.mono, fontSize: "10px", color: C.slate, gridColumn: "1/-1", textAlign: "center", padding: "8px 0" }}>Tap edit to add clocks</div>}
+            </div>
+          ) : (
+            /* Edit mode */
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              {CLOCK_CATALOG.map(c => {
+                const active = activeClocks.includes(c.tz);
                 return (
-                  <div key={idx.id} style={{ textAlign: "center", animation: `typeReveal 0.3s ease ${0.06 * i}s both` }}>
-                    <div style={{ fontFamily: F.display, fontSize: isMobile ? "20px" : "18px", color: C.cream, fontWeight: 300, lineHeight: 1.2 }}>
-                      {idx.price?.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                    </div>
-                    <div style={{ fontFamily: F.mono, fontSize: "9px", marginTop: "4px", color: up ? C.success : C.danger }}>
-                      {up ? "+" : ""}{idx.changePct?.toFixed(2)}%
-                    </div>
-                    <div style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate }}>{idx.symbol}</div>
-                  </div>
+                  <button key={c.tz + c.label} onClick={() => toggleClock(c.tz)} style={{
+                    background: active ? "rgba(123,143,163,0.15)" : "transparent",
+                    border: `1px solid ${active ? C.amber : C.stone}`,
+                    borderRadius: "4px", padding: "4px 8px", cursor: "pointer",
+                    fontFamily: F.mono, fontSize: "9px",
+                    color: active ? C.cream : C.iron,
+                    transition: "all 0.2s ease",
+                  }}>{c.label} <span style={{ color: C.slate, fontSize: "8px" }}>{c.abbr}</span></button>
                 );
               })}
             </div>
+          )}
+        </div>
+
+        {/* Tickers Widget */}
+        <div style={{
+          background: "rgba(22,22,32,0.4)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+          border: "1px solid rgba(70,70,90,0.25)", borderRadius: "10px",
+          padding: isMobile ? "16px" : "18px 20px",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+        }}>
+          {/* Widget header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+            <span style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate, letterSpacing: "0.08em", textTransform: "uppercase" }}>Tickers</span>
+            <button onClick={() => setEditTickers(!editTickers)} style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontFamily: F.mono, fontSize: "8px", color: editTickers ? C.amber : C.slate,
+              letterSpacing: "0.04em",
+            }}>{editTickers ? "done" : "edit"}</button>
+          </div>
+
+          {/* Ticker display */}
+          {!editTickers ? (
+            markets?.indices ? (
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${Math.min(markets.indices.length, isMobile ? 2 : 4)}, 1fr)`,
+                gap: "8px",
+              }}>
+                {markets.indices.filter(idx => activeTickers.includes(idx.symbol)).map((idx, i) => {
+                  const up = idx.change >= 0;
+                  return (
+                    <div key={idx.id} style={{ textAlign: "center", animation: `typeReveal 0.3s ease ${0.06 * i}s both` }}>
+                      <div style={{ fontFamily: F.display, fontSize: isMobile ? "20px" : "18px", color: C.cream, fontWeight: 300, lineHeight: 1.2 }}>
+                        {idx.price?.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </div>
+                      <div style={{ fontFamily: F.mono, fontSize: "9px", marginTop: "4px", color: up ? C.success : C.danger }}>
+                        {up ? "+" : ""}{idx.changePct?.toFixed(2)}%
+                      </div>
+                      <div style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate }}>{idx.symbol}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontFamily: F.mono, fontSize: "10px", color: C.iron }}>
+                {loading ? "Loading..." : "Connect Finnhub"}
+              </div>
+            )
           ) : (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontFamily: F.mono, fontSize: "10px", color: C.iron }}>
-              {loading ? "Loading..." : "Connect Finnhub"}
+            /* Edit mode */
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              {TICKER_CATALOG.map(t => {
+                const active = activeTickers.includes(t.symbol);
+                return (
+                  <button key={t.symbol} onClick={() => toggleTicker(t.symbol)} style={{
+                    background: active ? "rgba(123,143,163,0.15)" : "transparent",
+                    border: `1px solid ${active ? C.amber : C.stone}`,
+                    borderRadius: "4px", padding: "4px 8px", cursor: "pointer",
+                    fontFamily: F.mono, fontSize: "9px",
+                    color: active ? C.cream : C.iron,
+                    transition: "all 0.2s ease",
+                  }}>{t.symbol} <span style={{ color: C.slate, fontSize: "8px" }}>{t.label}</span></button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -1405,7 +1534,7 @@ function IntegrationsModule({ isMobile, liveData, session }) {
   const icons = {
     finnhub: I.signal,
     github: I.external,
-    anthropic: I.command,
+    anthropic: I.bell,
     gmail: I.layers,
     gcal: I.layers,
   };
@@ -2102,15 +2231,15 @@ function ChatShell({ isMobile, session, liveData, triggerRefresh }) {
             backgroundColor: C.cavern, border: `1px solid ${C.stone}`,
             textAlign: "center",
           }}>
-            <div style={{ fontFamily: F.display, fontSize: "20px", color: C.cream, marginBottom: "8px" }}>Command Prompt</div>
+            <div style={{ fontFamily: F.display, fontSize: "20px", color: C.cream, marginBottom: "8px" }}>Alfred</div>
             <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.iron, lineHeight: 1.6, marginBottom: "16px" }}>
-              Connect your Anthropic API key in Integrations to enable the command prompt. Once connected, you can manage tasks, query projects, and control the Batcave with natural language.
+              Connect your Anthropic API key in Integrations to enable Alfred. Once connected, you can manage tasks, query projects, and control the Batcave with natural language.
             </div>
             <div style={{
               fontFamily: F.mono, fontSize: "10px", color: C.slate,
               padding: "8px 14px", backgroundColor: C.obsidian, borderRadius: "4px",
               display: "inline-block",
-            }}>ANTHROPIC_API_KEY not connected</div>
+            }}>ANTHROPIC KEY NOT CONNECTED</div>
           </div>
         )}
 
@@ -2119,9 +2248,9 @@ function ChatShell({ isMobile, session, liveData, triggerRefresh }) {
             padding: isMobile ? "20px" : "28px", borderRadius: "6px",
             backgroundColor: C.cavern, border: `1px solid ${C.stone}`,
           }}>
-            <div style={{ fontFamily: F.display, fontSize: "20px", color: C.cream, marginBottom: "8px" }}>Command Prompt</div>
+            <div style={{ fontFamily: F.display, fontSize: "20px", color: C.cream, marginBottom: "8px" }}>Alfred</div>
             <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.iron, lineHeight: 1.6 }}>
-              Manage tasks, query status, control your projects. Try:
+              Your AI assistant. Manage tasks, query status, control your projects. Try:
             </div>
             <div style={{ fontFamily: F.mono, fontSize: "12px", color: C.fog, marginTop: "12px", lineHeight: 2 }}>
               <div style={{ color: C.amber }}>"add task: review Q1 metrics, high priority, due friday"</div>
@@ -2595,7 +2724,7 @@ export default function BatcaveConsole() {
 
   const modules = [
     { id: "home", label: "Home", icon: I.home },
-    { id: "command", label: "Command", icon: I.command },
+    { id: "command", label: "Alfred", icon: I.bell },
     { id: "tasks", label: "Tasks", icon: I.tasks },
     { id: "calendar", label: "Calendar", icon: I.layers },
     { id: "news", label: "News", icon: I.signal },
@@ -2607,7 +2736,7 @@ export default function BatcaveConsole() {
 
   const moduleMeta = {
     home: { title: "Briefing", mono: "Command Center", subtitle: new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) },
-    command: { title: "Command", mono: "Prompt", subtitle: "Natural language control" },
+    command: { title: "Alfred", mono: "AI Assistant", subtitle: "Natural language control" },
     tasks: { title: "Tasks", mono: "Personal Ops", subtitle: "Priority-driven task management" },
     calendar: { title: "Calendar", mono: "Schedule", subtitle: "Personal, professional, and travel — one view" },
     news: { title: "News", mono: "Headlines", subtitle: "Market news and global events" },
@@ -2656,8 +2785,8 @@ export default function BatcaveConsole() {
           onMouseEnter={e => e.currentTarget.style.backgroundColor = C.slate}
           onMouseLeave={e => e.currentTarget.style.backgroundColor = C.stone}
         >
-          <div style={{ width: isMobile ? "18px" : "14px", height: isMobile ? "18px" : "14px", color: C.iron }}>{I.search}</div>
-          <span style={{ fontFamily: F.sans, fontSize: isMobile ? "14px" : "12px", color: C.iron, flex: 1 }}>Command</span>
+          <div style={{ width: isMobile ? "18px" : "14px", height: isMobile ? "18px" : "14px", color: C.iron }}>{I.bell}</div>
+          <span style={{ fontFamily: F.sans, fontSize: isMobile ? "14px" : "12px", color: C.iron, flex: 1 }}>Alfred</span>
           {!isMobile && (
             <kbd style={{
               fontFamily: F.mono, fontSize: "9px", color: C.iron,
@@ -2674,7 +2803,7 @@ export default function BatcaveConsole() {
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.7 // batcave</span>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.8 // batcave</span>
           {auth.session && (
             <button onClick={auth.signOut} style={{
               background: "none", border: "none", cursor: "pointer",
