@@ -1148,94 +1148,157 @@ function Alfred({ isMobile, session, triggerRefresh }) {
   );
 }
 
-function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
+
+// ─── Ticker Bar (persistent, all modules) ────────────────────────
+function TickerBar({ isMobile }) {
   const [markets, setMarkets] = useState(null);
-  const [brief, setBrief] = useState(null);
-  const [briefLoading, setBriefLoading] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [time, setTime] = useState(new Date());
-  const [editClocks, setEditClocks] = useState(false);
-  const [editTickers, setEditTickers] = useState(false);
-  const [ctx, setCtx] = useState(null); // live context: tasks, events
+  const [showConfig, setShowConfig] = useState(false);
 
-  const headers = session?.access_token
-    ? { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }
-    : { "Content-Type": "application/json" };
-
-  const fetchContext = useCallback(async () => {
-    try {
-      const [tasksRes, eventsRes] = await Promise.all([
-        fetch("/api/tasks", { headers }).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch("/api/events", { headers }).then(r => r.ok ? r.json() : null).catch(() => null),
-      ]);
-      const today = new Date().toISOString().slice(0, 10);
-      const tasks = tasksRes?.tasks || [];
-      const events = (eventsRes?.events || []).filter(e => (e.end_date || e.start_date) >= today);
-      const open = tasks.filter(t => !t.completed);
-      const overdue = open.filter(t => t.due_date && t.due_date < today);
-      const high = open.filter(t => t.priority === "high");
-      const dueToday = open.filter(t => t.due_date === today);
-      setCtx({ tasks, open, overdue, high, dueToday, events, total: tasks.length, completed: tasks.filter(t => t.completed).length });
-    } catch {}
-  }, [session]);
-
-  // Configurable widgets — persisted to localStorage
+  const TICKER_CATALOG = [
+    { symbol: "SPY", label: "S&P 500" }, { symbol: "QQQ", label: "NASDAQ" }, { symbol: "DIA", label: "DOW" },
+    { symbol: "IWM", label: "Russell" }, { symbol: "AAPL", label: "Apple" }, { symbol: "MSFT", label: "MSFT" },
+    { symbol: "NVDA", label: "NVDA" }, { symbol: "TSLA", label: "Tesla" }, { symbol: "GLD", label: "Gold" },
+  ];
   const CLOCK_CATALOG = [
     { label: "Nashville", tz: "America/Chicago", abbr: "CT" },
     { label: "New York", tz: "America/New_York", abbr: "ET" },
-    { label: "Los Angeles", tz: "America/Los_Angeles", abbr: "PT" },
-    { label: "Seattle", tz: "America/Los_Angeles", abbr: "PT" },
-    { label: "Denver", tz: "America/Denver", abbr: "MT" },
+    { label: "LA", tz: "America/Los_Angeles", abbr: "PT" },
     { label: "London", tz: "Europe/London", abbr: "GMT" },
-    { label: "Paris", tz: "Europe/Paris", abbr: "CET" },
-    { label: "Berlin", tz: "Europe/Berlin", abbr: "CET" },
-    { label: "Dubai", tz: "Asia/Dubai", abbr: "GST" },
-    { label: "Mumbai", tz: "Asia/Kolkata", abbr: "IST" },
     { label: "Tokyo", tz: "Asia/Tokyo", abbr: "JST" },
-    { label: "Singapore", tz: "Asia/Singapore", abbr: "SGT" },
+    { label: "Dubai", tz: "Asia/Dubai", abbr: "GST" },
     { label: "Sydney", tz: "Australia/Sydney", abbr: "AEST" },
-    { label: "Honolulu", tz: "Pacific/Honolulu", abbr: "HST" },
   ];
-
-  const TICKER_CATALOG = [
-    { symbol: "SPY", label: "S&P 500" },
-    { symbol: "QQQ", label: "NASDAQ" },
-    { symbol: "DIA", label: "DOW" },
-    { symbol: "IWM", label: "Russell 2K" },
-    { symbol: "AAPL", label: "Apple" },
-    { symbol: "MSFT", label: "Microsoft" },
-    { symbol: "GOOGL", label: "Google" },
-    { symbol: "AMZN", label: "Amazon" },
-    { symbol: "NVDA", label: "NVIDIA" },
-    { symbol: "TSLA", label: "Tesla" },
-    { symbol: "BTC-USD", label: "Bitcoin" },
-    { symbol: "GLD", label: "Gold" },
-  ];
-
-  const defaultClocks = ["America/Chicago", "America/New_York", "America/Los_Angeles", "Europe/London"];
-  const defaultTickers = ["SPY", "QQQ", "DIA"];
 
   const loadSetting = (key, fallback) => {
     try { const v = window.localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
   };
-  const saveSetting = (key, val) => {
-    try { window.localStorage.setItem(key, JSON.stringify(val)); } catch {}
+  const saveSetting = (key, val) => { try { window.localStorage.setItem(key, JSON.stringify(val)); } catch {} };
+
+  const [activeClocks, setActiveClocks] = useState(() => loadSetting("bc_clocks", ["America/Chicago", "America/New_York", "America/Los_Angeles"]));
+  const [activeTickers, setActiveTickers] = useState(() => loadSetting("bc_tickers", ["SPY", "QQQ", "DIA"]));
+
+  const toggle = (arr, setArr, key, val) => {
+    const next = arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val];
+    setArr(next); saveSetting(key, next);
   };
 
-  const [activeClocks, setActiveClocks] = useState(() => loadSetting("bc_clocks", defaultClocks));
-  const [activeTickers, setActiveTickers] = useState(() => loadSetting("bc_tickers", defaultTickers));
+  useEffect(() => {
+    fetch("/api/markets").then(r => r.ok ? r.json() : null).then(d => d && setMarkets(d)).catch(() => {});
+    const t = setInterval(() => setTime(new Date()), 30000);
+    return () => clearInterval(t);
+  }, []);
 
-  const toggleClock = (tz) => {
-    const next = activeClocks.includes(tz) ? activeClocks.filter(t => t !== tz) : [...activeClocks, tz];
-    setActiveClocks(next);
-    saveSetting("bc_clocks", next);
+  const getTime = (tz) => {
+    try { return time.toLocaleTimeString("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit", hour12: true }); } catch { return "--"; }
   };
 
-  const toggleTicker = (sym) => {
-    const next = activeTickers.includes(sym) ? activeTickers.filter(s => s !== sym) : [...activeTickers, sym];
-    setActiveTickers(next);
-    saveSetting("bc_tickers", next);
-  };
+  const clockData = CLOCK_CATALOG.filter(c => activeClocks.includes(c.tz));
+  const tickerData = markets?.indices?.filter(t => activeTickers.includes(t.symbol)) || [];
+
+  const items = [];
+  clockData.forEach(c => items.push({ type: "clock", label: c.label, value: getTime(c.tz), abbr: c.abbr }));
+  tickerData.forEach(t => {
+    const up = t.change >= 0;
+    items.push({ type: "ticker", label: t.symbol, value: t.price?.toLocaleString(undefined, { maximumFractionDigits: 0 }), change: `${up ? "+" : ""}${t.changePct?.toFixed(1)}%`, up });
+  });
+
+  return (
+    <>
+      <div style={{
+        height: "28px", display: "flex", alignItems: "center",
+        background: "rgba(14,14,20,0.85)",
+        borderBottom: "1px solid rgba(50,50,65,0.3)",
+        fontFamily: F.mono, fontSize: "10px",
+        position: "relative", zIndex: 40, flexShrink: 0,
+        overflow: "hidden",
+      }}>
+        {/* Scrolling content */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: "0",
+          animation: items.length > 4 && !isMobile ? `tickerScroll ${items.length * 4}s linear infinite` : "none",
+          whiteSpace: "nowrap", paddingLeft: isMobile ? "8px" : "12px",
+        }}>
+          {items.map((item, i) => (
+            <div key={`${item.type}-${item.label}-${i}`} style={{
+              display: "inline-flex", alignItems: "center", gap: "5px",
+              padding: "0 12px",
+              borderRight: "1px solid rgba(50,50,65,0.2)",
+            }}>
+              {item.type === "clock" && (
+                <>
+                  <span style={{ color: C.fog }}>{item.value}</span>
+                  <span style={{ color: C.slate, fontSize: "8px" }}>{item.label}</span>
+                </>
+              )}
+              {item.type === "ticker" && (
+                <>
+                  <span style={{ color: C.slate, fontSize: "8px" }}>{item.label}</span>
+                  <span style={{ color: C.fog }}>{item.value}</span>
+                  <span style={{ color: item.up ? C.success : C.danger, fontSize: "9px" }}>{item.change}</span>
+                </>
+              )}
+            </div>
+          ))}
+          {items.length === 0 && <span style={{ color: C.slate, padding: "0 12px" }}>Connect Finnhub for live data</span>}
+        </div>
+
+        {/* Config toggle */}
+        <button onClick={() => setShowConfig(!showConfig)} style={{
+          position: "absolute", right: "6px", top: "50%", transform: "translateY(-50%)",
+          background: "none", border: "none", cursor: "pointer",
+          color: showConfig ? C.amber : C.slate, fontSize: "10px",
+          padding: "2px 4px",
+        }}>{showConfig ? "x" : I.settings ? "..." : "..."}</button>
+      </div>
+
+      {/* Config panel */}
+      {showConfig && (
+        <div style={{
+          background: "rgba(14,14,20,0.95)", borderBottom: "1px solid rgba(50,50,65,0.3)",
+          padding: isMobile ? "12px" : "10px 16px",
+          display: "flex", flexDirection: "column", gap: "8px",
+          zIndex: 39, position: "relative",
+          animation: "fadeUp 0.15s ease both",
+        }}>
+          <div>
+            <div style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate, letterSpacing: "0.08em", marginBottom: "4px" }}>CLOCKS</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+              {CLOCK_CATALOG.map(c => {
+                const on = activeClocks.includes(c.tz);
+                return <button key={c.tz} onClick={() => toggle(activeClocks, setActiveClocks, "bc_clocks", c.tz)} style={{
+                  background: on ? "rgba(123,143,163,0.15)" : "transparent", border: `1px solid ${on ? C.amber : C.stone}`,
+                  borderRadius: "3px", padding: "2px 6px", fontFamily: F.mono, fontSize: "8px", color: on ? C.cream : C.iron, cursor: "pointer",
+                }}>{c.label}</button>;
+              })}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate, letterSpacing: "0.08em", marginBottom: "4px" }}>TICKERS</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+              {TICKER_CATALOG.map(t => {
+                const on = activeTickers.includes(t.symbol);
+                return <button key={t.symbol} onClick={() => toggle(activeTickers, setActiveTickers, "bc_tickers", t.symbol)} style={{
+                  background: on ? "rgba(123,143,163,0.15)" : "transparent", border: `1px solid ${on ? C.amber : C.stone}`,
+                  borderRadius: "3px", padding: "2px 6px", fontFamily: F.mono, fontSize: "8px", color: on ? C.cream : C.iron, cursor: "pointer",
+                }}>{t.symbol}</button>;
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ─── Homepage Module (Briefing IS the screen) ────────────────────
+function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
+  const [brief, setBrief] = useState(null);
+  const [briefLoading, setBriefLoading] = useState(false);
+
+  const headers = session?.access_token
+    ? { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }
+    : { "Content-Type": "application/json" };
 
   const fetchBrief = useCallback(async (forceNew) => {
     setBriefLoading(true);
@@ -1250,347 +1313,177 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
     setBriefLoading(false);
   }, [session]);
 
-  const fetchMarkets = useCallback(async () => {
-    setLoading(true);
+  useEffect(() => { fetchBrief(false); }, [fetchBrief]);
+
+  // Parse brief content — it should be JSON array now, fallback to text
+  let briefItems = [];
+  if (brief?.content) {
     try {
-      const mkts = await fetch("/api/markets").then(r => r.ok ? r.json() : null).catch(() => null);
-      setMarkets(mkts);
-    } catch {}
-    setLoading(false);
-  }, []);
+      const cleaned = brief.content.replace(/```json\s*|```/g, "").trim();
+      briefItems = JSON.parse(cleaned);
+      if (!Array.isArray(briefItems)) briefItems = [];
+    } catch {
+      // Fallback: treat as plain text lines
+      briefItems = brief.content.split("\n").filter(l => l.trim()).map(l => ({
+        text: l.trim().replace(/^[-*]\s*/, ""),
+        horizon: "today", mood: "neutral", category: "task", icon_hint: "circle",
+      }));
+    }
+  }
 
-  useEffect(() => { fetchMarkets(); fetchBrief(false); fetchContext(); }, [fetchMarkets, fetchBrief, fetchContext]);
-  useEffect(() => { if (refreshKey > 0) fetchContext(); }, [refreshKey, fetchContext]);
-  useEffect(() => { const t = setInterval(() => setTime(new Date()), 30000); return () => clearInterval(t); }, []);
+  const moodColors = {
+    urgent: C.danger,
+    alert: C.caution,
+    warm: "#B8924A",
+    neutral: C.fog,
+    positive: C.success,
+  };
 
-  const clockData = CLOCK_CATALOG.filter(c => activeClocks.includes(c.tz));
-  const getTimeIn = (tz) => { try { return time.toLocaleTimeString("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit", hour12: true }); } catch { return "--"; } };
+  const horizonLabels = {
+    now: "NOW",
+    today: "TODAY",
+    tomorrow: "TOMORROW",
+    week: "THIS WEEK",
+    fyi: "FYI",
+  };
+
+  // Simple icon renderer based on hint
+  const iconFor = (hint, mood) => {
+    const color = moodColors[mood] || C.fog;
+    const s = { width: "20px", height: "20px", color, flexShrink: 0 };
+    const h = (hint || "").toLowerCase();
+    if (h.includes("laundry") || h.includes("clothes")) return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><rect x="4" y="2" width="16" height="20" rx="2" /><circle cx="12" cy="13" r="4" /><path d="M8 6h2" /></svg>;
+    if (h.includes("airplane") || h.includes("flight") || h.includes("travel") || h.includes("trip")) return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M17.8 19.2L16 11l3.5-3.5C20.3 6.7 20.3 5.3 19.5 4.5 18.7 3.7 17.3 3.7 16.5 4.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5L2.5 8.8c-.3.5 0 1.1.5 1.3L9 12l-2 2H4l-1 2 4-1 4-1 2.3-2.3L15 18c.2.5.8.8 1.3.5l2.1-1.2c.4-.2.6-.6.5-1.1z" /></svg>;
+    if (h.includes("calendar") || h.includes("event") || h.includes("meeting")) return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>;
+    if (h.includes("warning") || h.includes("alert") || h.includes("overdue")) return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><path d="M12 9v4M12 17h.01" /></svg>;
+    if (h.includes("gift") || h.includes("birthday") || h.includes("celebration")) return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><rect x="3" y="8" width="18" height="13" rx="1" /><path d="M12 8v13M3 12h18" /><path d="M12 8a4 4 0 00-4-4c-1.5 0-2 1.5 0 3l4 1M12 8a4 4 0 014-4c1.5 0 2 1.5 0 3l-4 1" /></svg>;
+    if (h.includes("code") || h.includes("deploy") || h.includes("build") || h.includes("project")) return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" /></svg>;
+    if (h.includes("chart") || h.includes("market") || h.includes("stock") || h.includes("finance")) return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>;
+    if (h.includes("news") || h.includes("newspaper") || h.includes("headline")) return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2" /><path d="M18 14h-8M18 18h-8M18 6h-8v4h8V6z" /></svg>;
+    if (h.includes("sun") || h.includes("weather") || h.includes("clear")) return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="5" /><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" /></svg>;
+    if (h.includes("check") || h.includes("done") || h.includes("complete")) return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>;
+    if (h.includes("box") || h.includes("return") || h.includes("package")) return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><path d="M12 22.08V12" /></svg>;
+    // Default circle
+    return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="3" /></svg>;
+  };
 
   return (
     <div style={{ animation: "fadeUp 0.4s ease both" }}>
-      {/* Alfred — front and center */}
-      <div style={{ marginBottom: "24px" }}>
+      {/* Alfred bar */}
+      <div style={{ marginBottom: "28px" }}>
         <Alfred isMobile={isMobile} session={session} triggerRefresh={triggerRefresh} />
       </div>
 
-      {/* Clocks + Compact Tickers */}
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "14px", marginBottom: "24px" }}>
-        {/* World Clocks Widget */}
-        <div style={{
-          background: "rgba(22,22,32,0.4)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-          border: "1px solid rgba(70,70,90,0.25)", borderRadius: "10px",
-          padding: isMobile ? "16px" : "18px 20px",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
-        }}>
-          {/* Widget header */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <span style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate, letterSpacing: "0.08em", textTransform: "uppercase" }}>Clocks</span>
-            <button onClick={() => setEditClocks(!editClocks)} style={{
-              background: "none", border: "none", cursor: "pointer",
-              fontFamily: F.mono, fontSize: "8px", color: editClocks ? C.amber : C.slate,
-              letterSpacing: "0.04em",
-            }}>{editClocks ? "done" : "edit"}</button>
-          </div>
-
-          {/* Clock display */}
-          {!editClocks ? (
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: `repeat(${isMobile ? Math.min(clockData.length, 2) : Math.min(clockData.length, 4)}, 1fr)`,
-              gap: isMobile ? "16px" : "8px",
-            }}>
-              {clockData.map((c, i) => (
-                <div key={c.tz} style={{ textAlign: "center", animation: `typeReveal 0.3s ease ${0.06 * i}s both` }}>
-                  <div style={{ fontFamily: F.display, fontSize: isMobile ? "24px" : "22px", color: i === 0 ? C.cream : C.fog, fontWeight: 300, lineHeight: 1.2 }}>{getTimeIn(c.tz)}</div>
-                  <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, letterSpacing: "0.06em", marginTop: "4px" }}>{c.label}</div>
-                  <div style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate }}>{c.abbr}</div>
-                </div>
-              ))}
-              {clockData.length === 0 && <div style={{ fontFamily: F.mono, fontSize: "10px", color: C.slate, gridColumn: "1/-1", textAlign: "center", padding: "8px 0" }}>Tap edit to add clocks</div>}
-            </div>
-          ) : (
-            /* Edit mode */
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-              {CLOCK_CATALOG.map(c => {
-                const active = activeClocks.includes(c.tz);
-                return (
-                  <button key={c.tz + c.label} onClick={() => toggleClock(c.tz)} style={{
-                    background: active ? "rgba(123,143,163,0.15)" : "transparent",
-                    border: `1px solid ${active ? C.amber : C.stone}`,
-                    borderRadius: "4px", padding: "4px 8px", cursor: "pointer",
-                    fontFamily: F.mono, fontSize: "9px",
-                    color: active ? C.cream : C.iron,
-                    transition: "all 0.2s ease",
-                  }}>{c.label} <span style={{ color: C.slate, fontSize: "8px" }}>{c.abbr}</span></button>
-                );
-              })}
-            </div>
-          )}
+      {/* Brief header */}
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        marginBottom: "24px",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ width: "16px", height: "16px", color: C.amber }}>{I.bell}</div>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.amber, letterSpacing: "0.08em" }}>
+            {brief?.brief_date ? `BRIEFING / ${brief.brief_date}` : "BRIEFING"}
+          </span>
         </div>
-
-        {/* Tickers Widget */}
-        <div style={{
-          background: "rgba(22,22,32,0.4)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-          border: "1px solid rgba(70,70,90,0.25)", borderRadius: "10px",
-          padding: isMobile ? "16px" : "18px 20px",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
-        }}>
-          {/* Widget header */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <span style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate, letterSpacing: "0.08em", textTransform: "uppercase" }}>Tickers</span>
-            <button onClick={() => setEditTickers(!editTickers)} style={{
-              background: "none", border: "none", cursor: "pointer",
-              fontFamily: F.mono, fontSize: "8px", color: editTickers ? C.amber : C.slate,
-              letterSpacing: "0.04em",
-            }}>{editTickers ? "done" : "edit"}</button>
-          </div>
-
-          {/* Ticker display */}
-          {!editTickers ? (
-            markets?.indices ? (
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: `repeat(${Math.min(markets.indices.length, isMobile ? 2 : 4)}, 1fr)`,
-                gap: "8px",
-              }}>
-                {markets.indices.filter(idx => activeTickers.includes(idx.symbol)).map((idx, i) => {
-                  const up = idx.change >= 0;
-                  return (
-                    <div key={idx.id} style={{ textAlign: "center", animation: `typeReveal 0.3s ease ${0.06 * i}s both` }}>
-                      <div style={{ fontFamily: F.display, fontSize: isMobile ? "20px" : "18px", color: C.cream, fontWeight: 300, lineHeight: 1.2 }}>
-                        {idx.price?.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                      </div>
-                      <div style={{ fontFamily: F.mono, fontSize: "9px", marginTop: "4px", color: up ? C.success : C.danger }}>
-                        {up ? "+" : ""}{idx.changePct?.toFixed(2)}%
-                      </div>
-                      <div style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate }}>{idx.symbol}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontFamily: F.mono, fontSize: "10px", color: C.iron }}>
-                {loading ? "Loading..." : "Connect Finnhub"}
-              </div>
-            )
-          ) : (
-            /* Edit mode */
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-              {TICKER_CATALOG.map(t => {
-                const active = activeTickers.includes(t.symbol);
-                return (
-                  <button key={t.symbol} onClick={() => toggleTicker(t.symbol)} style={{
-                    background: active ? "rgba(123,143,163,0.15)" : "transparent",
-                    border: `1px solid ${active ? C.amber : C.stone}`,
-                    borderRadius: "4px", padding: "4px 8px", cursor: "pointer",
-                    fontFamily: F.mono, fontSize: "9px",
-                    color: active ? C.cream : C.iron,
-                    transition: "all 0.2s ease",
-                  }}>{t.symbol} <span style={{ color: C.slate, fontSize: "8px" }}>{t.label}</span></button>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <button onClick={() => fetchBrief(true)} disabled={briefLoading} style={{
+          background: briefLoading ? "transparent" : C.cavern,
+          border: `1px solid ${C.stone}`, borderRadius: "4px",
+          padding: isMobile ? "6px 12px" : "4px 10px",
+          fontFamily: F.mono, fontSize: "9px", color: briefLoading ? C.iron : C.amber,
+          cursor: "pointer",
+        }}>{briefLoading ? "generating..." : briefItems.length > 0 ? "regenerate" : "generate"}</button>
       </div>
 
-      {/* ── Briefing Dashboard ── */}
-      <div style={{ marginBottom: "28px" }}>
-        {/* Status strip */}
-        {ctx && (
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)",
-            gap: "10px", marginBottom: "16px",
-          }}>
-            {[
-              {
-                label: "Tasks",
-                value: ctx.open.length,
-                sub: ctx.overdue.length > 0 ? `${ctx.overdue.length} overdue` : "all clear",
-                color: ctx.overdue.length > 0 ? C.danger : C.success,
-                pct: ctx.total > 0 ? Math.round((ctx.completed / ctx.total) * 100) : 0,
-              },
-              {
-                label: "High Priority",
-                value: ctx.high.length,
-                sub: ctx.high.length > 0 ? ctx.high[0].title.slice(0, 20) : "none",
-                color: ctx.high.length > 0 ? C.caution : C.success,
-              },
-              {
-                label: "Due Today",
-                value: ctx.dueToday.length,
-                sub: ctx.dueToday.length > 0 ? ctx.dueToday[0].title.slice(0, 20) : "clear",
-                color: ctx.dueToday.length > 0 ? C.amber : C.iron,
-              },
-              {
-                label: "Events",
-                value: ctx.events.length,
-                sub: ctx.events.length > 0 ? ctx.events[0].title.slice(0, 20) : "nothing upcoming",
-                color: C.amber,
-              },
-            ].map((s, i) => (
-              <div key={s.label} style={{
-                background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "8px",
-                padding: isMobile ? "12px" : "14px 16px",
-                animation: `typeReveal 0.3s ease ${0.06 * i}s both`,
-                position: "relative", overflow: "hidden",
-              }}>
-                {/* Top accent */}
+      {/* Briefing lines */}
+      {briefItems.length > 0 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+          {briefItems.map((item, i) => {
+            const color = moodColors[item.mood] || C.fog;
+            const isUrgent = item.horizon === "now" || item.mood === "urgent";
+            return (
+              <div key={i} style={{
+                display: "flex", alignItems: "flex-start", gap: isMobile ? "12px" : "16px",
+                padding: isMobile ? "14px 12px" : "14px 16px",
+                borderRadius: "6px",
+                background: isUrgent ? "rgba(154,74,74,0.06)" : i === 0 ? "rgba(123,143,163,0.04)" : "transparent",
+                borderLeft: `2px solid ${color}`,
+                animation: `typeReveal 0.35s ease ${0.06 * i}s both`,
+                transition: "background 0.2s ease",
+              }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(123,143,163,0.06)"}
+                onMouseLeave={e => e.currentTarget.style.background = isUrgent ? "rgba(154,74,74,0.06)" : i === 0 ? "rgba(123,143,163,0.04)" : "transparent"}
+              >
+                {/* Icon */}
+                <div style={{ marginTop: "1px" }}>
+                  {iconFor(item.icon_hint, item.mood)}
+                </div>
+
+                {/* Content */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontFamily: F.sans, fontSize: isMobile ? "14px" : "14px",
+                    color: isUrgent ? C.cream : C.parchment,
+                    lineHeight: 1.5, fontWeight: isUrgent ? 500 : 400,
+                  }}>{item.text}</div>
+                </div>
+
+                {/* Horizon tag */}
                 <div style={{
-                  position: "absolute", top: 0, left: 0, right: 0, height: "2px",
-                  background: `linear-gradient(90deg, ${s.color}50, transparent)`,
-                }} />
-                <div style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "6px" }}>{s.label}</div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
-                  <span style={{ fontFamily: F.display, fontSize: isMobile ? "26px" : "28px", color: C.cream, fontWeight: 300, lineHeight: 1 }}>{s.value}</span>
-                  {s.pct !== undefined && (
-                    <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron }}>{s.pct}% done</span>
-                  )}
-                </div>
-                <div style={{ fontFamily: F.sans, fontSize: "11px", color: s.color, marginTop: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.sub}</div>
+                  fontFamily: F.mono, fontSize: "7px", letterSpacing: "0.08em",
+                  color, padding: "2px 6px", borderRadius: "2px",
+                  border: `1px solid ${color}25`,
+                  flexShrink: 0, marginTop: "3px",
+                  whiteSpace: "nowrap",
+                }}>{horizonLabels[item.horizon] || item.horizon?.toUpperCase()}</div>
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* Upcoming timeline */}
-        {ctx?.events.length > 0 && (
+            );
+          })}
+        </div>
+      ) : !briefLoading ? (
+        /* Empty state */
+        <div style={{
+          textAlign: "center", padding: isMobile ? "60px 20px" : "80px 40px",
+        }}>
           <div style={{
-            background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "8px",
-            padding: isMobile ? "14px" : "16px 20px", marginBottom: "16px",
-            animation: "typeReveal 0.4s ease 0.15s both",
-          }}>
-            <div style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "10px" }}>Upcoming</div>
-            <div style={{ display: "flex", gap: isMobile ? "10px" : "16px", overflowX: "auto", paddingBottom: "4px" }}>
-              {ctx.events.slice(0, 5).map((ev, i) => {
-                const catColors = { personal: C.amber, professional: "#6A8FA3", travel: "#8A6FA3", health: C.success, project: "#A38A6F" };
-                const evColor = catColors[ev.category] || C.amber;
-                const startD = new Date(ev.start_date + "T00:00:00");
-                return (
-                  <div key={ev.id} style={{
-                    flexShrink: 0, minWidth: isMobile ? "120px" : "140px",
-                    display: "flex", gap: "10px", alignItems: "center",
-                    animation: `typeReveal 0.3s ease ${0.08 * i}s both`,
-                  }}>
-                    {/* Date block */}
-                    <div style={{
-                      width: "38px", height: "38px", borderRadius: "6px",
-                      background: `${evColor}15`, border: `1px solid ${evColor}30`,
-                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                      flexShrink: 0,
-                    }}>
-                      <div style={{ fontFamily: F.mono, fontSize: "7px", color: evColor, textTransform: "uppercase", lineHeight: 1 }}>
-                        {startD.toLocaleDateString("en-US", { month: "short" })}
-                      </div>
-                      <div style={{ fontFamily: F.display, fontSize: "16px", color: C.cream, lineHeight: 1, fontWeight: 400 }}>
-                        {startD.getDate()}
-                      </div>
-                    </div>
-                    {/* Event info */}
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontFamily: F.sans, fontSize: "12px", color: C.parchment, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.title}</div>
-                      {ev.location && <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, marginTop: "2px" }}>{ev.location}</div>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* AI Brief — prose section */}
-        {brief?.content ? (
+            width: "32px", height: "32px", color: C.amber, margin: "0 auto 16px",
+            opacity: 0.5,
+          }}>{I.bell}</div>
           <div style={{
-            background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "8px",
-            padding: isMobile ? "16px" : "20px 24px",
-            position: "relative",
-            animation: "fadeUp 0.4s ease both",
-          }}>
-            {/* Left accent */}
-            <div style={{
-              position: "absolute", left: 0, top: "16px", bottom: "16px", width: "2px",
-              background: `linear-gradient(180deg, ${C.amber}, transparent)`,
-            }} />
-
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <div style={{ width: "14px", height: "14px", color: C.amber }}>{I.bell}</div>
-                <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.amber, letterSpacing: "0.06em" }}>ALFRED'S BRIEF</span>
-                <span style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate }}>{brief.brief_date}</span>
-              </div>
-              <button onClick={() => fetchBrief(true)} disabled={briefLoading} style={{
-                background: "none", border: "none", cursor: "pointer",
-                fontFamily: F.mono, fontSize: "9px", color: C.iron, opacity: briefLoading ? 0.4 : 0.7,
-              }}>{briefLoading ? "generating..." : "regenerate"}</button>
-            </div>
-
-            <div>
-              {brief.content.split("\n").filter(l => l.trim()).map((line, i) => {
-                const t = line.trim();
-                if (i === 0) return (
-                  <div key={i} style={{
-                    fontFamily: F.body, fontSize: isMobile ? "15px" : "16px",
-                    fontWeight: 400, color: C.cream, lineHeight: 1.5,
-                    marginBottom: "12px",
-                    animation: `typeReveal 0.3s ease ${0.06*(i+1)}s both`,
-                  }}>{t}</div>
-                );
-                if (t.startsWith("-") || t.startsWith("*")) return (
-                  <div key={i} style={{
-                    display: "flex", gap: "8px", alignItems: "flex-start",
-                    padding: "4px 0",
-                    animation: `typeReveal 0.3s ease ${0.05*(i+1)}s both`,
-                  }}>
-                    <div style={{ width: "3px", height: "3px", borderRadius: "50%", backgroundColor: C.amber, marginTop: "7px", flexShrink: 0 }} />
-                    <span style={{ fontFamily: F.sans, fontSize: "13px", color: C.fog, lineHeight: 1.55 }}>{t.replace(/^[-*]\s*/,"")}</span>
-                  </div>
-                );
-                if (t.endsWith(":") || (t === t.toUpperCase() && t.length < 40)) return (
-                  <div key={i} style={{
-                    fontFamily: F.mono, fontSize: "8px", letterSpacing: "0.1em",
-                    textTransform: "uppercase", color: C.amber,
-                    marginTop: "12px", marginBottom: "4px",
-                    animation: `typeReveal 0.3s ease ${0.05*(i+1)}s both`,
-                  }}>{t}</div>
-                );
-                return (
-                  <div key={i} style={{
-                    fontFamily: F.sans, fontSize: "13px", color: C.fog,
-                    lineHeight: 1.55, padding: "2px 0",
-                    animation: `typeReveal 0.3s ease ${0.05*(i+1)}s both`,
-                  }}>{t}</div>
-                );
-              })}
-            </div>
-
-            {brief.tokens_used && (
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "12px", paddingTop: "10px", borderTop: `1px solid ${C.stone}` }}>
-                <div style={{ width: "3px", height: "3px", borderRadius: "50%", backgroundColor: C.success, animation: "breathe 3s ease infinite" }} />
-                <span style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate }}>{brief.tokens_used} tokens</span>
-              </div>
-            )}
-          </div>
-        ) : (
+            fontFamily: F.display, fontSize: isMobile ? "20px" : "24px",
+            color: C.cream, fontWeight: 300, marginBottom: "8px",
+          }}>Alfred is ready</div>
           <div style={{
-            background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "8px",
-            padding: isMobile ? "28px 20px" : "36px 32px", textAlign: "center",
+            fontFamily: F.sans, fontSize: "13px", color: C.iron, lineHeight: 1.6,
+            maxWidth: "340px", margin: "0 auto 20px",
           }}>
-            <div style={{ width: "24px", height: "24px", color: C.amber, margin: "0 auto 12px", opacity: 0.6 }}>{I.bell}</div>
-            <div style={{ fontFamily: F.display, fontSize: isMobile ? "18px" : "20px", color: C.cream, marginBottom: "8px", fontWeight: 300 }}>Alfred's Briefing</div>
-            <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.iron, lineHeight: 1.6, marginBottom: "16px" }}>
-              {briefLoading ? "Assembling context..." : "Connect Anthropic in Integrations, then generate."}
-            </div>
-            {!briefLoading && (
-              <button onClick={() => fetchBrief(true)} style={{
-                background: C.amber, border: "none", borderRadius: "6px",
-                padding: "8px 20px", fontFamily: F.mono, fontSize: "11px", fontWeight: 500,
-                color: C.obsidian, cursor: "pointer", letterSpacing: "0.04em",
-              }}>generate</button>
-            )}
+            Connect your Anthropic key in Integrations, then generate your first briefing.
           </div>
-        )}
-      </div>
+          <button onClick={() => fetchBrief(true)} style={{
+            background: C.amber, border: "none", borderRadius: "6px",
+            padding: "10px 24px", fontFamily: F.mono, fontSize: "11px", fontWeight: 500,
+            color: C.obsidian, cursor: "pointer", letterSpacing: "0.04em",
+          }}>generate briefing</button>
+        </div>
+      ) : (
+        /* Loading state */
+        <div style={{ textAlign: "center", padding: "60px 20px" }}>
+          <div style={{ fontFamily: F.mono, fontSize: "12px", color: C.iron, animation: "breathe 2s ease infinite" }}>
+            Alfred is assembling your brief...
+          </div>
+        </div>
+      )}
+
+      {/* Token footer */}
+      {brief?.tokens_used && briefItems.length > 0 && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: "6px",
+          marginTop: "20px", paddingTop: "12px",
+          borderTop: `1px solid ${C.stone}`,
+        }}>
+          <div style={{ width: "3px", height: "3px", borderRadius: "50%", backgroundColor: C.success, animation: "breathe 3s ease infinite" }} />
+          <span style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate }}>{brief.tokens_used} tokens</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -2995,7 +2888,7 @@ export default function BatcaveConsole() {
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v4.1 // batcave</span>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v4.2 // batcave</span>
           {auth.session && (
             <button onClick={auth.signOut} style={{
               background: "none", border: "none", cursor: "pointer",
@@ -3053,6 +2946,10 @@ export default function BatcaveConsole() {
         @keyframes shimmer {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(100%); }
+        }
+        @keyframes tickerScroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
         }
         @keyframes orbFloat {
           0%, 100% { transform: translate(0, 0) scale(1); }
@@ -3172,6 +3069,9 @@ export default function BatcaveConsole() {
           <svg style={{ width: "100%", height: "100%", animation: "batWingSimple 0.33s ease-in-out infinite", animationDelay: "-0.15s" }}><use href="#bat-s" /></svg>
         </div>
       </div>
+
+      {/* Persistent ticker bar */}
+      <TickerBar isMobile={isMobile} />
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
 
