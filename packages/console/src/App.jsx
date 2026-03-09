@@ -426,28 +426,10 @@ function LoginScreen({ onLogin, isMobile }) {
         }
       `}</style>
 
-      {/* Background orbs */}
-      <div style={{
-        position: "absolute", top: "-20%", right: "-10%",
-        width: "60vw", height: "60vw", maxWidth: "600px", maxHeight: "600px",
-        borderRadius: "50%", pointerEvents: "none",
-        background: "radial-gradient(circle, rgba(123,143,163,0.2) 0%, rgba(123,143,163,0.06) 40%, transparent 65%)",
-        animation: "loginOrb 20s ease-in-out infinite",
-      }} />
-      <div style={{
-        position: "absolute", bottom: "-25%", left: "-15%",
-        width: "50vw", height: "50vw", maxWidth: "500px", maxHeight: "500px",
-        borderRadius: "50%", pointerEvents: "none",
-        background: "radial-gradient(circle, rgba(90,138,106,0.16) 0%, rgba(90,138,106,0.04) 40%, transparent 65%)",
-        animation: "loginOrb 25s ease-in-out infinite",
-        animationDelay: "-8s",
-      }} />
-
-      {/* Horizontal accent line */}
+      {/* Subtle accent line */}
       <div style={{
         position: "absolute", top: "35%", left: 0, right: 0, height: "1px",
-        background: "linear-gradient(90deg, transparent, rgba(123,143,163,0.18), transparent)",
-        animation: "loginPulse 6s ease infinite",
+        background: "linear-gradient(90deg, transparent, rgba(123,143,163,0.1), transparent)",
       }} />
 
       <div style={{
@@ -458,7 +440,7 @@ function LoginScreen({ onLogin, isMobile }) {
         <div style={{ textAlign: "center", marginBottom: "48px" }}>
           <div style={{
             width: "56px", height: "56px", color: C.amber, margin: "0 auto 20px",
-            filter: "drop-shadow(0 0 30px rgba(123,143,163,0.5)) drop-shadow(0 0 60px rgba(123,143,163,0.2))",
+            filter: "drop-shadow(0 0 16px rgba(123,143,163,0.25))",
             animation: "fadeUp 0.6s ease 0.1s both",
           }}>{I.bat}</div>
           <div style={{
@@ -475,8 +457,8 @@ function LoginScreen({ onLogin, isMobile }) {
 
         {/* Form */}
         <div style={{
-          background: "rgba(20, 20, 30, 0.4)",
-          backdropFilter: "blur(24px) saturate(140%)",
+          background: "rgba(22, 22, 30, 0.75)",
+          backdropFilter: "blur(8px)",
           WebkitBackdropFilter: "blur(16px) saturate(120%)",
           border: "1px solid rgba(60, 60, 80, 0.3)",
           borderRadius: "12px",
@@ -530,7 +512,7 @@ function LoginScreen({ onLogin, isMobile }) {
             color: loading || !email || !password ? C.iron : C.obsidian,
             cursor: loading || !email || !password ? "not-allowed" : "pointer",
             transition: "all 0.3s ease",
-            boxShadow: loading || !email || !password ? "none" : "0 4px 30px rgba(123,143,163,0.25), 0 0 60px rgba(123,143,163,0.1)",
+            boxShadow: loading || !email || !password ? "none" : "0 2px 16px rgba(123,143,163,0.12)",
           }}>
             {loading ? "..." : mode === "login" ? "Sign In" : "Create Account"}
           </button>
@@ -608,13 +590,13 @@ function CommandBar({ onClose, isMobile, session, onAction }) {
         backgroundColor: C.cavern,
         border: `1px solid ${C.slate}`,
         borderRadius: "12px", overflow: "hidden",
-        boxShadow: `0 32px 100px rgba(0,0,0,0.7), 0 0 0 1px rgba(60,60,80,0.3), 0 0 80px rgba(123,143,163,0.1), inset 0 1px 0 rgba(255,255,255,0.03)`,
+        boxShadow: `0 24px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(60,60,80,0.2)`,
         animation: "slideUp 0.25s cubic-bezier(0.22,1,0.36,1)",
       }}>
         {/* Top glow bar */}
         <div style={{
           position: "absolute", top: 0, left: "10%", right: "10%", height: "1px",
-          background: `linear-gradient(90deg, transparent, ${C.amber}, transparent)`,
+          background: `linear-gradient(90deg, transparent, ${C.amber}40, transparent)`,
           backgroundSize: "200% 100%",
           animation: "borderFlow 4s ease infinite",
         }} />
@@ -628,7 +610,7 @@ function CommandBar({ onClose, isMobile, session, onAction }) {
           <div style={{
             width: "18px", height: "18px", flexShrink: 0,
             color: loading ? C.caution : C.amber,
-            filter: loading ? "none" : "drop-shadow(0 0 10px rgba(123,143,163,0.5))",
+            filter: loading ? "none" : "drop-shadow(0 0 4px rgba(123,143,163,0.2))",
             transition: "filter 0.3s ease",
           }}>{I.bell}</div>
           <input ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
@@ -735,14 +717,14 @@ function NavItem({ icon, label, active, collapsed, onClick, isMobile }) {
       {active && <div style={{
         position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)",
         width: "2px", height: "60%",
-        boxShadow: `0 0 12px 3px rgba(123,143,163,0.5)`,
+        boxShadow: `0 0 6px 1px rgba(123,143,163,0.2)`,
         pointerEvents: "none",
       }} />}
       <div style={{
         width: isMobile ? "22px" : "18px", height: isMobile ? "22px" : "18px", flexShrink: 0,
         color: lit ? C.amber : C.iron,
         transition: "color 0.25s ease, filter 0.25s ease",
-        filter: active ? "drop-shadow(0 0 6px rgba(123,143,163,0.5))" : "none",
+        filter: active ? "drop-shadow(0 0 3px rgba(123,143,163,0.2))" : "none",
       }}>{icon}</div>
       {!collapsed && (
         <span style={{
@@ -1339,8 +1321,7 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
             border: "1px solid rgba(70,70,90,0.25)",
             boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03), 0 4px 32px rgba(0,0,0,0.2)",
           }}>
-            <div style={{ position: "absolute", top: "-40px", right: "-40px", width: "200px", height: "200px", borderRadius: "50%",
-              background: "radial-gradient(circle, rgba(123,143,163,0.25) 0%, transparent 75%)", animation: "orbFloat 15s ease-in-out infinite", pointerEvents: "none" }} />
+
             <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "3px",
               background: `linear-gradient(180deg, ${C.amber}, ${C.amberLight}80, transparent)`, backgroundSize: "100% 200%", animation: "borderFlow 6s ease infinite" }} />
 
@@ -2803,7 +2784,7 @@ export default function BatcaveConsole() {
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.8 // batcave</span>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.9 // batcave</span>
           {auth.session && (
             <button onClick={auth.signOut} style={{
               background: "none", border: "none", cursor: "pointer",
@@ -2871,32 +2852,15 @@ export default function BatcaveConsole() {
 
         /* Glass card base */
         .bc-glass {
-          background: rgba(22, 22, 32, 0.5);
-          backdrop-filter: blur(16px) saturate(130%);
-          -webkit-backdrop-filter: blur(16px) saturate(130%);
-          border: 1px solid rgba(70, 70, 90, 0.25);
+          background: rgba(24, 24, 32, 0.7);
+          border: 1px solid rgba(60, 60, 75, 0.2);
           border-radius: 10px;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 4px 24px rgba(0,0,0,0.2);
         }
         .bc-glass:hover {
-          border-color: rgba(123, 143, 163, 0.25);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 32px rgba(0,0,0,0.25), 0 0 20px rgba(123,143,163,0.04);
+          border-color: rgba(123, 143, 163, 0.15);
         }
 
-        /* Visible noise texture overlay */
-        .bc-noise::before {
-          content: '';
-          position: fixed;
-          inset: 0;
-          z-index: 9998;
-          pointer-events: none;
-          opacity: 0.35;
-          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
-          background-repeat: repeat;
-          background-size: 256px 256px;
-        }
-
-        /* Animated border */
+/* Animated border */
         .bc-glow-border {
           position: relative;
         }
@@ -2925,32 +2889,78 @@ export default function BatcaveConsole() {
         select:focus { border-color: ${C.amber} !important; }
       `}</style>
 
-      <div className="bc-noise" />
+      {/* Bat silhouettes drifting through the cave */}
+      <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
+        {/* Bat SVG sprite — reusable */}
+        <svg style={{ position: "absolute", width: 0, height: 0 }}>
+          <defs>
+            <symbol id="bat-s" viewBox="0 0 24 14">
+              <path d="M12 8 C8 3, 2 2, 0 5 C2 4, 5 2, 8 5 L12 8 L16 5 C19 2, 22 4, 24 5 C22 2, 16 3, 12 8Z" fill="currentColor" />
+              <ellipse cx="12" cy="9" rx="2" ry="3" fill="currentColor" />
+              <path d="M10 7 L10.5 5.5 M14 7 L13.5 5.5" stroke="currentColor" strokeWidth="0.4" fill="none" />
+            </symbol>
+          </defs>
+        </svg>
 
-      {/* Atmospheric orbs — actually visible */}
-      <div style={{
-        position: "fixed", top: "-15%", right: "-10%",
-        width: "50vw", height: "50vw", maxWidth: "700px", maxHeight: "700px",
-        borderRadius: "50%", pointerEvents: "none", zIndex: 0,
-        background: "radial-gradient(circle, rgba(123,143,163,0.22) 0%, rgba(123,143,163,0.08) 40%, transparent 65%)",
-        animation: "orbFloat 25s ease-in-out infinite",
-      }} />
-      <div style={{
-        position: "fixed", bottom: "-20%", left: "-5%",
-        width: "40vw", height: "40vw", maxWidth: "500px", maxHeight: "500px",
-        borderRadius: "50%", pointerEvents: "none", zIndex: 0,
-        background: "radial-gradient(circle, rgba(90,138,106,0.15) 0%, rgba(90,138,106,0.05) 40%, transparent 65%)",
-        animation: "orbFloat 30s ease-in-out infinite",
-        animationDelay: "-10s",
-      }} />
-      <div style={{
-        position: "fixed", top: "40%", left: "30%",
-        width: "30vw", height: "30vw", maxWidth: "400px", maxHeight: "400px",
-        borderRadius: "50%", pointerEvents: "none", zIndex: 0,
-        background: "radial-gradient(circle, rgba(184,144,64,0.12) 0%, rgba(184,144,64,0.03) 40%, transparent 65%)",
-        animation: "orbFloat 35s ease-in-out infinite",
-        animationDelay: "-18s",
-      }} />
+        {/* Bat 1 — large, slow, crosses right */}
+        <div style={{
+          position: "absolute", top: "15%", left: "-5%",
+          width: "28px", height: "16px", color: "rgba(90, 90, 106, 0.12)",
+          animation: "batFly1 45s linear infinite",
+        }}>
+          <svg style={{ width: "100%", height: "100%", animation: "batWingSimple 0.4s ease-in-out infinite" }}><use href="#bat-s" /></svg>
+        </div>
+
+        {/* Bat 2 — medium, crosses left from right side */}
+        <div style={{
+          position: "absolute", top: "35%", right: "-3%",
+          width: "22px", height: "13px", color: "rgba(90, 90, 106, 0.08)",
+          animation: "batFly2 55s linear infinite",
+          animationDelay: "-12s",
+        }}>
+          <svg style={{ width: "100%", height: "100%", animation: "batWingSimple 0.35s ease-in-out infinite", animationDelay: "-0.1s" }}><use href="#bat-s" /></svg>
+        </div>
+
+        {/* Bat 3 — small, high, fast */}
+        <div style={{
+          position: "absolute", top: "8%", left: "-8%",
+          width: "16px", height: "10px", color: "rgba(90, 90, 106, 0.06)",
+          animation: "batFly3 35s linear infinite",
+          animationDelay: "-20s",
+        }}>
+          <svg style={{ width: "100%", height: "100%", animation: "batWingSimple 0.3s ease-in-out infinite", animationDelay: "-0.2s" }}><use href="#bat-s" /></svg>
+        </div>
+
+        {/* Bat 4 — large, low, very slow */}
+        <div style={{
+          position: "absolute", top: "65%", left: "-6%",
+          width: "32px", height: "18px", color: "rgba(90, 90, 106, 0.1)",
+          animation: "batFly1 65s linear infinite",
+          animationDelay: "-30s",
+        }}>
+          <svg style={{ width: "100%", height: "100%", animation: "batWingSimple 0.45s ease-in-out infinite" }}><use href="#bat-s" /></svg>
+        </div>
+
+        {/* Bat 5 — tiny, mid-height */}
+        <div style={{
+          position: "absolute", top: "50%", right: "-4%",
+          width: "14px", height: "8px", color: "rgba(90, 90, 106, 0.05)",
+          animation: "batFly2 40s linear infinite",
+          animationDelay: "-5s",
+        }}>
+          <svg style={{ width: "100%", height: "100%", animation: "batWingSimple 0.28s ease-in-out infinite" }}><use href="#bat-s" /></svg>
+        </div>
+
+        {/* Bat 6 — medium, upper third */}
+        <div style={{
+          position: "absolute", top: "22%", left: "-10%",
+          width: "20px", height: "12px", color: "rgba(90, 90, 106, 0.07)",
+          animation: "batFly3 50s linear infinite",
+          animationDelay: "-38s",
+        }}>
+          <svg style={{ width: "100%", height: "100%", animation: "batWingSimple 0.33s ease-in-out infinite", animationDelay: "-0.15s" }}><use href="#bat-s" /></svg>
+        </div>
+      </div>
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
 
@@ -2959,9 +2969,9 @@ export default function BatcaveConsole() {
           <div style={{
             position: "fixed", top: 0, left: 0, right: 0, zIndex: 50,
             height: "56px",
-            background: "rgba(18, 18, 26, 0.6)",
-            backdropFilter: "blur(20px) saturate(130%)",
-            WebkitBackdropFilter: "blur(20px) saturate(130%)",
+            background: "rgba(20, 20, 28, 0.88)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
             borderBottom: "1px solid rgba(60, 60, 80, 0.25)",
             display: "flex", alignItems: "center", padding: "0 16px", gap: "12px",
           }}>
@@ -3005,9 +3015,9 @@ export default function BatcaveConsole() {
           drawerOpen && (
             <nav style={{
               position: "fixed", top: 0, left: 0, bottom: 0, width: "280px",
-              background: "rgba(16, 16, 24, 0.7)",
-              backdropFilter: "blur(24px) saturate(130%)",
-              WebkitBackdropFilter: "blur(24px) saturate(130%)",
+              background: "rgba(20, 20, 28, 0.92)",
+              backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
               zIndex: 101,
               display: "flex", flexDirection: "column",
               animation: "slideRight 0.25s cubic-bezier(0.22,1,0.36,1)",
@@ -3038,9 +3048,9 @@ export default function BatcaveConsole() {
           // Desktop sidebar
           <nav style={{
             width: collapsed ? 56 : 200,
-            background: "rgba(18, 18, 26, 0.55)",
-            backdropFilter: "blur(16px) saturate(120%)",
-            WebkitBackdropFilter: "blur(16px) saturate(120%)",
+            background: "rgba(20, 20, 28, 0.8)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
             borderRight: "1px solid rgba(60, 60, 80, 0.25)",
             display: "flex", flexDirection: "column",
             transition: "width 0.25s cubic-bezier(0.22,1,0.36,1)",
@@ -3048,14 +3058,7 @@ export default function BatcaveConsole() {
             animation: mounted ? "fadeIn 0.4s ease" : "none",
             position: "relative",
           }}>
-            {/* Sidebar ambient glow */}
-            <div style={{
-              position: "absolute", top: "-30px", left: "-30px",
-              width: "160px", height: "160px", borderRadius: "50%",
-              background: "radial-gradient(circle, rgba(123,143,163,0.25) 0%, rgba(123,143,163,0.08) 40%, transparent 70%)",
-              animation: "orbFloat 20s ease-in-out infinite",
-              pointerEvents: "none", zIndex: 0,
-            }} />
+
             <div onClick={() => setCollapsed(!collapsed)} style={{
               padding: collapsed ? "18px 14px" : "20px 16px",
               cursor: "pointer", display: "flex", alignItems: "center", gap: "10px",
@@ -3065,7 +3068,7 @@ export default function BatcaveConsole() {
               <div style={{
                 width: "28px", height: "28px", color: C.amber, flexShrink: 0,
                 animation: "gentleDrift 6s ease-in-out infinite",
-                filter: "drop-shadow(0 0 12px rgba(123,143,163,0.4))",
+                filter: "drop-shadow(0 0 6px rgba(123,143,163,0.15))",
               }}>{I.bat}</div>
               {!collapsed && (
                 <span style={{ fontFamily: F.display, fontSize: "19px", color: C.cream, whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>Batcave</span>
@@ -3091,7 +3094,7 @@ export default function BatcaveConsole() {
               <h1 style={{
                 fontFamily: F.display, fontSize: "48px", fontWeight: 300,
                 color: C.cream, lineHeight: 1.05, marginBottom: "8px", letterSpacing: "-0.02em",
-                textShadow: "0 0 40px rgba(123,143,163,0.15)",
+                textShadow: "0 0 20px rgba(123,143,163,0.06)",
                 animation: "typeReveal 0.5s ease 0.15s both",
               }}>{meta.title}</h1>
             )}
