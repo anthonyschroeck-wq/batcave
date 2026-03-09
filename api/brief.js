@@ -111,8 +111,8 @@ ITEM RULES:
 - "now" = overdue or happening today. "today" = do today. "tomorrow" = tomorrow. "week" = this week. "fyi" = awareness only.
 - mood drives color: urgent=red, warm=amber, neutral=default, positive=green, alert=yellow
 - Write like a chief of staff: "Pack for Seattle — flight Monday." not "You have a trip..."
-- 6-12 items. Most urgent first, FYI last.
-- Synthesize news into 1-2 FYI lines.
+- 8-14 items. Most urgent first, FYI last.
+- NEWS: Include exactly 3 news items at the end as FYI items. Focus on world news and economics/markets. Each should be a single, punchy headline rewritten in your voice — not a copy of the source headline. Use category "news" and icon_hint "newspaper" or "chart" as appropriate. If no news headlines are available, skip them.
 - Today's date is ${new Date().toISOString().slice(0, 10)}. Current hour: ${new Date().getHours()}.`,
         messages: [{ role: "user", content: contextStr }],
       }),
