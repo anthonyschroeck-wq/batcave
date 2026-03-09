@@ -922,24 +922,87 @@ function ProjectsModule({ isMobile, liveData }) {
   const active = manifest.projects.filter(p => p.status === "active");
   const liveDeployed = Object.values(deployData || {}).filter(d => d.production?.state === "READY").length;
 
+  // Collect deploy errors across all projects
+  const deployErrors = [];
+  if (deployData) {
+    for (const [slug, data] of Object.entries(deployData)) {
+      if (data.production?.state === "ERROR") {
+        deployErrors.push({
+          project: manifest.projects.find(p => p.slug === slug)?.name || slug,
+          env: "production",
+          sha: data.production.meta?.githubCommitSha?.slice(0, 7) || "unknown",
+          message: data.production.meta?.githubCommitMessage || "",
+          time: data.production.created,
+        });
+      }
+      if (data.preview?.state === "ERROR") {
+        deployErrors.push({
+          project: manifest.projects.find(p => p.slug === slug)?.name || slug,
+          env: "preview",
+          sha: data.preview.meta?.githubCommitSha?.slice(0, 7) || "unknown",
+          message: data.preview.meta?.githubCommitMessage || "",
+          time: data.preview.created,
+        });
+      }
+    }
+  }
+
   return (
     <div>
+      {/* Deploy error alert */}
+      {deployErrors.length > 0 && (
+        <div style={{
+          background: "rgba(154,74,74,0.08)", border: "1px solid rgba(154,74,74,0.2)",
+          borderRadius: "8px", padding: isMobile ? "14px" : "16px 20px",
+          marginBottom: "20px", animation: "fadeUp 0.3s ease both",
+          position: "relative", overflow: "hidden",
+        }}>
+          <div style={{
+            position: "absolute", top: 0, left: 0, right: 0, height: "2px",
+            background: `linear-gradient(90deg, ${C.danger}, transparent)`,
+          }} />
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+            <div style={{
+              width: "6px", height: "6px", borderRadius: "50%",
+              backgroundColor: C.danger, animation: "breathe 2s ease infinite",
+            }} />
+            <span style={{
+              fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.08em",
+              textTransform: "uppercase", color: C.danger,
+            }}>{deployErrors.length} deploy error{deployErrors.length > 1 ? "s" : ""}</span>
+          </div>
+          {deployErrors.map((err, i) => (
+            <div key={i} style={{
+              display: "flex", alignItems: "center", gap: "10px",
+              padding: "6px 0", borderTop: i > 0 ? `1px solid rgba(154,74,74,0.1)` : "none",
+              fontFamily: F.mono, fontSize: "11px",
+            }}>
+              <span style={{ color: C.danger, fontWeight: 600 }}>{err.project}</span>
+              <span style={{ color: C.iron }}>{err.env}</span>
+              <span style={{ color: C.slate }}>@{err.sha}</span>
+              <span style={{ color: C.iron, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "10px" }}>{err.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Stats */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: isMobile ? "repeat(4, 1fr)" : "repeat(4, auto)",
+        gridTemplateColumns: isMobile ? "repeat(4, 1fr)" : "repeat(5, auto)",
         gap: isMobile ? "16px" : "40px",
         marginBottom: "24px", animation: "fadeUp 0.4s ease both",
       }}>
         {[
           { label: "Total", value: manifest.projects.length },
           { label: "Active", value: active.length },
-          { label: "Deployed", value: status?.vercel?.connected ? liveDeployed : "—" },
+          { label: "Deployed", value: status?.vercel?.connected ? liveDeployed : "--" },
           { label: "In-Repo", value: manifest.projects.filter(p => p.migrated).length },
+          { label: "Errors", value: deployErrors.length, color: deployErrors.length > 0 ? C.danger : C.success },
         ].map(stat => (
           <div key={stat.label}>
-            <div style={{ fontFamily: F.display, fontSize: isMobile ? "28px" : "32px", color: C.cream, lineHeight: 1 }}>{stat.value}</div>
-            <div style={{ fontFamily: F.mono, fontSize: isMobile ? "9px" : "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: C.iron, marginTop: "4px" }}>{stat.label}</div>
+            <div style={{ fontFamily: F.display, fontSize: isMobile ? "28px" : "32px", color: stat.color || C.cream, lineHeight: 1 }}>{stat.value}</div>
+            <div style={{ fontFamily: F.mono, fontSize: isMobile ? "9px" : "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: stat.color ? stat.color : C.iron, marginTop: "4px" }}>{stat.label}</div>
           </div>
         ))}
       </div>
@@ -1173,10 +1236,6 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
     setActiveTickers(next);
     saveSetting("bc_tickers", next);
   };
-
-  const headers = session?.access_token
-    ? { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }
-    : { "Content-Type": "application/json" };
 
   const fetchBrief = useCallback(async (forceNew) => {
     setBriefLoading(true);
@@ -2936,7 +2995,7 @@ export default function BatcaveConsole() {
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v4.0 // batcave</span>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v4.1 // batcave</span>
           {auth.session && (
             <button onClick={auth.signOut} style={{
               background: "none", border: "none", cursor: "pointer",
