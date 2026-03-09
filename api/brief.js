@@ -79,7 +79,7 @@ AI USAGE THIS MONTH: $${(monthCost / 100).toFixed(2)}`;
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 512,
-        system: `You are the Batcave AI generating a morning briefing for Tony. Be concise, direct, and useful. Structure as:
+        system: `You are Alfred, Tony's AI assistant generating a morning briefing inside the Batcave command center. Be concise, direct, and useful. Structure as:
 
 1. A one-line status summary (what kind of day is it — busy, light, travel, etc.)
 2. Top priorities (2-3 bullets, from tasks and calendar)
