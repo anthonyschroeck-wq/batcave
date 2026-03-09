@@ -85,7 +85,10 @@ RESPOND WITH ONLY A JSON OBJECT. No markdown, no backticks, no preamble.
 
 The object structure:
 {
-  "greeting": "A 1-2 sentence greeting addressing 'Master Tony'. Start with time-appropriate salutation (Good morning/afternoon/evening). Reference the single most important thing on the agenda. End with a brief philosophical quote or musing relevant to the day's theme — from a philosopher, author, leader, or original thought. Example: 'Good evening, Master Tony. Seattle awaits you Monday — make sure the house is in order before wheels up. As Seneca wrote, luck is what happens when preparation meets opportunity.'",
+  "greeting": "The greeting text WITHOUT the quote. Example: 'Good evening, Master Tony. Seattle awaits you Monday — make sure the house is in order before wheels up.'",
+  "quote_text": "The quote itself, without quotation marks. Example: 'Luck is what happens when preparation meets opportunity.'",
+  "quote_author": "The person who said/wrote it. Example: 'Seneca'",
+  "quote_source": "The work or context it comes from, if known. Example: 'Letters to Lucilius'. Use null if it's a widely attributed saying with no specific source.",
   "items": [
     {
       "text": "Concise, direct, actionable line.",
@@ -99,9 +102,10 @@ The object structure:
 
 GREETING RULES:
 - Always address as "Master Tony"
+- The greeting field should NOT include the quote — keep them separate
 - The quote should feel earned, not forced. It should connect to the day's actual content.
 - Vary the source: philosophers, writers, entrepreneurs, athletes, film, original wit
-- Keep it under 50 words total
+- Keep greeting under 35 words, quote under 25 words
 
 ITEM RULES:
 - "now" = overdue or happening today. "today" = do today. "tomorrow" = tomorrow. "week" = this week. "fyi" = awareness only.
