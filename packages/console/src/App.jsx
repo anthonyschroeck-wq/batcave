@@ -1386,6 +1386,9 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
     if (h.includes("news") || h.includes("newspaper") || h.includes("headline")) return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2" /><path d="M18 14h-8M18 18h-8M18 6h-8v4h8V6z" /></svg>;
     if (h.includes("sun") || h.includes("weather") || h.includes("clear")) return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="5" /><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" /></svg>;
     if (h.includes("check") || h.includes("done") || h.includes("complete")) return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>;
+    if (h.includes("run") || h.includes("shoe") || h.includes("jog") || h.includes("cardio") || h.includes("fitness")) return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="17" cy="4" r="2"/><path d="M15 21l-3-6-4 3-3-4"/><path d="M19 13l-2-3-5 3"/></svg>;
+    if (h.includes("heart") || h.includes("health") || h.includes("pulse")) return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>;
+    if (h.includes("dumbbell") || h.includes("weight") || h.includes("gym")) return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M6 7v10M18 7v10M2 9v6M22 9v6M6 12h12"/></svg>;
     if (h.includes("box") || h.includes("return") || h.includes("package")) return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><path d="M12 22.08V12" /></svg>;
     // Default circle
     return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="3" /></svg>;
@@ -1615,7 +1618,7 @@ function NewsModule({ isMobile }) {
 
   const fetchNews = useCallback(async () => {
     setLoading(true);
-    try { const res = await fetch("/api/news?category=general"); if (res.ok) setNews(await res.json()); } catch {}
+    try { const res = await fetch("/api/markets?action=news&category=general"); if (res.ok) setNews(await res.json()); } catch {}
     setLoading(false);
   }, []);
 
@@ -3356,6 +3359,237 @@ function AgentsModule({ isMobile, session }) {
   );
 }
 
+
+// ─── Fitness Module ──────────────────────────────────────────────
+function FitnessModule({ isMobile, session }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showLog, setShowLog] = useState(false);
+  const [showGoal, setShowGoal] = useState(false);
+  const [logForm, setLogForm] = useState({ activity_type: "run", title: "", duration_minutes: "", distance_miles: "", notes: "", activity_date: new Date().toISOString().slice(0, 10) });
+  const [goalForm, setGoalForm] = useState({ title: "", category: "cardio", target_type: "frequency", target_value: 1, target_unit: "sessions", target_period: "day" });
+
+  const headers = session?.access_token
+    ? { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }
+    : { "Content-Type": "application/json" };
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/fitness", { headers });
+      if (res.ok) setData(await res.json());
+    } catch {}
+    setLoading(false);
+  }, [session]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const logActivity = async () => {
+    const body = { action: "log_activity", ...logForm, duration_minutes: parseInt(logForm.duration_minutes) || null, distance_miles: parseFloat(logForm.distance_miles) || null };
+    await fetch("/api/fitness", { method: "POST", headers, body: JSON.stringify(body) });
+    setShowLog(false);
+    setLogForm({ activity_type: "run", title: "", duration_minutes: "", distance_miles: "", notes: "", activity_date: new Date().toISOString().slice(0, 10) });
+    fetchData();
+  };
+
+  const createGoal = async () => {
+    await fetch("/api/fitness", { method: "POST", headers, body: JSON.stringify({ action: "create_goal", ...goalForm }) });
+    setShowGoal(false);
+    setGoalForm({ title: "", category: "cardio", target_type: "frequency", target_value: 1, target_unit: "sessions", target_period: "day" });
+    fetchData();
+  };
+
+  const activityIcons = {
+    run: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ width: 16, height: 16 }}><circle cx="17" cy="4" r="2"/><path d="M15 21l-3-6-4 3-3-4"/><path d="M19 13l-2-3-5 3"/></svg>,
+    cycle: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ width: 16, height: 16 }}><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17L9 4h4l3 5h2"/></svg>,
+    strength: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ width: 16, height: 16 }}><path d="M6 7v10M18 7v10M2 9v6M22 9v6M6 12h12"/></svg>,
+    walk: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ width: 16, height: 16 }}><circle cx="12" cy="4" r="2"/><path d="M14 20l-2-6-3 3-2-3"/><path d="M10 8l2 4 4-2"/></svg>,
+  };
+
+  const inputStyle = {
+    background: C.obsidian, border: `1px solid ${C.slate}`, borderRadius: "4px",
+    padding: isMobile ? "12px" : "8px 12px", fontFamily: F.sans, fontSize: isMobile ? "16px" : "13px",
+    color: C.parchment, outline: "none", width: "100%",
+  };
+
+  const stats = data?.stats || {};
+  const goals = data?.goals || [];
+  const recentLog = data?.recentLog || [];
+
+  return (
+    <div style={{ animation: "fadeUp 0.4s ease both" }}>
+      {/* Status strip */}
+      <div style={{
+        display: "grid", gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(5, 1fr)",
+        gap: "8px", marginBottom: "20px",
+      }}>
+        {[
+          { label: "Today", value: stats.today || 0, color: stats.loggedToday ? C.success : C.caution },
+          { label: "This Week", value: stats.thisWeek || 0, color: C.amber },
+          { label: "This Month", value: stats.thisMonth || 0, color: C.fog },
+          { label: "Minutes", value: stats.totalMinutes || 0, color: C.fog },
+          { label: "Miles", value: stats.totalMiles || "0", color: C.fog },
+        ].map(s => (
+          <div key={s.label} style={{
+            background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
+            padding: "10px 12px", textAlign: "center",
+          }}>
+            <div style={{ fontFamily: F.display, fontSize: isMobile ? "20px" : "22px", color: s.color, lineHeight: 1, fontWeight: 300 }}>{s.value}</div>
+            <div style={{ fontFamily: F.mono, fontSize: "7px", color: C.iron, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: "4px" }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Action bar */}
+      <div style={{ display: "flex", gap: "8px", marginBottom: "24px" }}>
+        <button onClick={() => { setShowLog(!showLog); setShowGoal(false); }} style={{
+          background: showLog ? C.stone : C.success, border: "none", borderRadius: "4px",
+          padding: isMobile ? "10px 16px" : "6px 14px", fontFamily: F.mono, fontSize: "11px", fontWeight: 600,
+          color: showLog ? C.iron : C.obsidian, cursor: "pointer", minHeight: isMobile ? "44px" : undefined,
+        }}>{showLog ? "cancel" : "+ log activity"}</button>
+        <button onClick={() => { setShowGoal(!showGoal); setShowLog(false); }} style={{
+          background: "none", border: `1px solid ${C.stone}`, borderRadius: "4px",
+          padding: isMobile ? "10px 16px" : "6px 14px", fontFamily: F.mono, fontSize: "11px",
+          color: C.amber, cursor: "pointer", minHeight: isMobile ? "44px" : undefined,
+        }}>{showGoal ? "cancel" : "+ set goal"}</button>
+      </div>
+
+      {/* Log form */}
+      {showLog && (
+        <div style={{
+          background: C.cavern, border: `1px solid ${C.success}`, borderRadius: "6px",
+          padding: isMobile ? "16px" : "16px 20px", marginBottom: "20px", animation: "fadeUp 0.2s ease both",
+        }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+            <select value={logForm.activity_type} onChange={e => setLogForm({...logForm, activity_type: e.target.value})} style={{ ...inputStyle, cursor: "pointer" }}>
+              <option value="run">Run</option><option value="walk">Walk</option><option value="cycle">Cycle</option>
+              <option value="swim">Swim</option><option value="strength">Strength</option><option value="yoga">Yoga</option><option value="other">Other</option>
+            </select>
+            <input value={logForm.title} onChange={e => setLogForm({...logForm, title: e.target.value})} placeholder="Title (optional)" style={inputStyle} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+            <input type="number" value={logForm.duration_minutes} onChange={e => setLogForm({...logForm, duration_minutes: e.target.value})} placeholder="Minutes" style={inputStyle} />
+            <input type="number" step="0.1" value={logForm.distance_miles} onChange={e => setLogForm({...logForm, distance_miles: e.target.value})} placeholder="Miles" style={inputStyle} />
+            <input type="date" value={logForm.activity_date} onChange={e => setLogForm({...logForm, activity_date: e.target.value})} style={inputStyle} />
+          </div>
+          <input value={logForm.notes} onChange={e => setLogForm({...logForm, notes: e.target.value})} placeholder="Notes (Strava link, how it felt, etc.)" style={{ ...inputStyle, marginBottom: "10px" }} />
+          <button onClick={logActivity} style={{
+            background: C.success, border: "none", borderRadius: "4px", padding: isMobile ? "12px 20px" : "8px 16px",
+            fontFamily: F.mono, fontSize: "11px", fontWeight: 600, color: C.obsidian, cursor: "pointer",
+          }}>log it</button>
+        </div>
+      )}
+
+      {/* Goal form */}
+      {showGoal && (
+        <div style={{
+          background: C.cavern, border: `1px solid ${C.amber}`, borderRadius: "6px",
+          padding: isMobile ? "16px" : "16px 20px", marginBottom: "20px", animation: "fadeUp 0.2s ease both",
+        }}>
+          <input value={goalForm.title} onChange={e => setGoalForm({...goalForm, title: e.target.value})} placeholder="Goal title (e.g. Daily cardio training)" style={{ ...inputStyle, marginBottom: "10px" }} />
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: "10px", marginBottom: "10px" }}>
+            <select value={goalForm.category} onChange={e => setGoalForm({...goalForm, category: e.target.value})} style={{ ...inputStyle, cursor: "pointer" }}>
+              <option value="cardio">Cardio</option><option value="strength">Strength</option><option value="flexibility">Flexibility</option><option value="recovery">Recovery</option>
+            </select>
+            <input type="number" value={goalForm.target_value} onChange={e => setGoalForm({...goalForm, target_value: parseFloat(e.target.value) || 0})} placeholder="Target" style={inputStyle} />
+            <select value={goalForm.target_unit} onChange={e => setGoalForm({...goalForm, target_unit: e.target.value})} style={{ ...inputStyle, cursor: "pointer" }}>
+              <option value="sessions">Sessions</option><option value="minutes">Minutes</option><option value="miles">Miles</option>
+            </select>
+            <select value={goalForm.target_period} onChange={e => setGoalForm({...goalForm, target_period: e.target.value})} style={{ ...inputStyle, cursor: "pointer" }}>
+              <option value="day">Per Day</option><option value="week">Per Week</option><option value="month">Per Month</option>
+            </select>
+          </div>
+          <button onClick={createGoal} disabled={!goalForm.title} style={{
+            background: goalForm.title ? C.amber : C.stone, border: "none", borderRadius: "4px",
+            padding: isMobile ? "12px 20px" : "8px 16px", fontFamily: F.mono, fontSize: "11px", fontWeight: 600,
+            color: goalForm.title ? C.obsidian : C.iron, cursor: goalForm.title ? "pointer" : "not-allowed",
+          }}>create goal</button>
+        </div>
+      )}
+
+      {/* Goals */}
+      {goals.length > 0 && (
+        <div style={{ marginBottom: "28px" }}>
+          <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.08em", marginBottom: "10px" }}>ACTIVE GOALS</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {goals.map((g, i) => (
+              <div key={g.id} style={{
+                background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "8px",
+                padding: isMobile ? "14px" : "16px 20px", position: "relative", overflow: "hidden",
+                animation: `fadeUp 0.3s ease ${0.04 * i}s both`,
+              }}>
+                {/* Progress bar background */}
+                <div style={{
+                  position: "absolute", top: 0, left: 0, bottom: 0,
+                  width: `${g.pct}%`, background: g.met ? "rgba(90,138,106,0.08)" : "rgba(123,143,163,0.05)",
+                  transition: "width 0.5s ease",
+                }} />
+
+                <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontFamily: F.sans, fontSize: "14px", fontWeight: 500, color: C.cream, marginBottom: "4px" }}>{g.title}</div>
+                    <div style={{ fontFamily: F.mono, fontSize: "10px", color: C.iron }}>
+                      {g.current}/{g.target_value} {g.target_unit} per {g.target_period}
+                      {g.streak_current > 0 && <span style={{ color: C.success, marginLeft: "8px" }}>{g.streak_current}-day streak</span>}
+                    </div>
+                  </div>
+                  <div style={{
+                    fontFamily: F.display, fontSize: isMobile ? "28px" : "32px",
+                    color: g.met ? C.success : g.pct > 50 ? C.amber : C.iron,
+                    fontWeight: 300, lineHeight: 1,
+                  }}>{g.pct}%</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent activity */}
+      <div>
+        <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.08em", marginBottom: "10px" }}>RECENT ACTIVITY</div>
+        {recentLog.length === 0 && !loading && (
+          <div style={{
+            textAlign: "center", padding: isMobile ? "40px 20px" : "48px 32px",
+            background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "8px",
+          }}>
+            <div style={{ fontFamily: F.display, fontSize: "20px", color: C.cream, fontWeight: 300, marginBottom: "8px" }}>No activity logged yet</div>
+            <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.iron, marginBottom: "16px" }}>Log your first workout or ask Alfred to set a daily cardio goal.</div>
+          </div>
+        )}
+        {recentLog.map((entry, i) => (
+          <div key={entry.id} style={{
+            display: "flex", alignItems: "center", gap: "12px",
+            padding: isMobile ? "12px 0" : "10px 0",
+            borderBottom: `1px solid ${C.stone}`,
+            animation: `fadeUp 0.25s ease ${0.03 * i}s both`,
+          }}>
+            {/* Icon */}
+            <div style={{ color: C.amber, flexShrink: 0 }}>
+              {activityIcons[entry.activity_type] || activityIcons.run}
+            </div>
+
+            {/* Info */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.parchment }}>
+                {entry.title || entry.activity_type.charAt(0).toUpperCase() + entry.activity_type.slice(1)}
+              </div>
+              <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, marginTop: "2px", display: "flex", gap: "10px" }}>
+                {entry.duration_minutes && <span>{entry.duration_minutes} min</span>}
+                {entry.distance_miles && <span>{entry.distance_miles} mi</span>}
+                <span>{entry.activity_date}</span>
+                {entry.source !== "manual" && <span style={{ color: C.amber }}>{entry.source}</span>}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {loading && !data && <div style={{ fontFamily: F.mono, fontSize: "11px", color: C.iron, textAlign: "center", padding: "20px" }}>Loading fitness data...</div>}
+    </div>
+  );
+}
+
 function PlaceholderModule({ description, items, isMobile }) {
   return (
     <div style={{ animation: "fadeUp 0.4s ease both" }}>
@@ -3448,6 +3682,7 @@ export default function BatcaveConsole() {
     { id: "finance", label: "Finance", icon: I.pulse },
     { id: "projects", label: "Projects", icon: I.workspace },
     { id: "agents", label: "Agents", icon: I.agent },
+    { id: "fitness", label: "Fitness", icon: I.pulse },
     { id: "integrations", label: "Integrations", icon: I.settings },
   ];
 
@@ -3460,6 +3695,7 @@ export default function BatcaveConsole() {
     finance: { title: "Finance", mono: "Markets", subtitle: "Indices, quotes, and market data" },
     projects: { title: "Projects", mono: "System Registry", subtitle: `${manifest.projects.length} registered across the system` },
     agents: { title: "Agents", mono: "Autonomous Systems", subtitle: "Deploy, monitor, and govern your AI workforce" },
+    fitness: { title: "Fitness", mono: "Performance", subtitle: "Goals, activity tracking, streaks" },
     integrations: { title: "Integrations", mono: "Admin", subtitle: "Manage service connections" },
   };
 
@@ -3510,7 +3746,7 @@ export default function BatcaveConsole() {
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v5.0 // batcave</span>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v5.1 // batcave</span>
           {auth.session && (
             <button onClick={auth.signOut} style={{
               background: "none", border: "none", cursor: "pointer",
@@ -3862,7 +4098,8 @@ export default function BatcaveConsole() {
             {activeModule === "projects" && <ProjectsModule isMobile={isMobile} liveData={liveData} />}
             {activeModule === "integrations" && <IntegrationsModule isMobile={isMobile} liveData={liveData} session={auth.session} />}
             {activeModule === "agents" && <AgentsModule isMobile={isMobile} session={auth.session} />}
-            {!["home","command","tasks","calendar","news","finance","projects","integrations","agents"].includes(activeModule) && placeholders[activeModule] && (
+            {activeModule === "fitness" && <FitnessModule isMobile={isMobile} session={auth.session} />}
+            {!["home","command","tasks","calendar","news","finance","projects","integrations","agents","fitness"].includes(activeModule) && placeholders[activeModule] && (
               <PlaceholderModule description={placeholders[activeModule].description} items={placeholders[activeModule].items} isMobile={isMobile} />
             )}
           </div>

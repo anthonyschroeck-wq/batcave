@@ -27,12 +27,14 @@ export default async function handler(req, res) {
   const weekOut = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
   const finnhubKey = await getSecret("finnhub");
 
-  const [tasksRes, eventsRes, usageRes] = await Promise.all([
+  const [tasksRes, eventsRes, usageRes, fitnessGoalsRes, fitnessTodayRes] = await Promise.all([
     supabase.from("batcave_tasks").select("*").eq("completed", false).order("due_date"),
     supabase.from("batcave_events").select("*").gte("end_date", today).order("start_date").limit(15),
     supabase.from("batcave_usage")
       .select("cost_cents")
       .gte("created_at", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
+    supabase.from("batcave_fitness_goals").select("*").eq("status", "active"),
+    supabase.from("batcave_fitness_log").select("*").eq("activity_date", today),
   ]);
 
   // Fetch news headlines if Finnhub is connected
@@ -49,6 +51,8 @@ export default async function handler(req, res) {
 
   const tasks = tasksRes.data || [];
   const events = eventsRes.data || [];
+  const fitnessGoals = fitnessGoalsRes.data || [];
+  const fitnessToday = fitnessTodayRes.data || [];
   const monthCost = (usageRes.data || []).reduce((s, u) => s + parseFloat(u.cost_cents || 0), 0);
   const overdue = tasks.filter(t => t.due_date && t.due_date < today);
 
@@ -61,10 +65,14 @@ ${overdue.length > 0 ? `OVERDUE: ${overdue.map(t => `${t.title} (was due ${t.due
 CALENDAR (upcoming):
 ${events.slice(0, 10).map(e => `- ${e.title}: ${e.start_date}${e.end_date !== e.start_date ? " to " + e.end_date : ""} [${e.category}]${e.location ? " @ " + e.location : ""}`).join("\n") || "Nothing scheduled"}
 
+FITNESS:
+${fitnessGoals.length > 0 ? fitnessGoals.map(g => `- GOAL: ${g.title} (${g.target_value} ${g.target_unit} per ${g.target_period})`).join("\n") : "No fitness goals set"}
+${fitnessToday.length > 0 ? `Today's activity: ${fitnessToday.map(l => `${l.activity_type}${l.duration_minutes ? ` ${l.duration_minutes}min` : ""}${l.distance_miles ? ` ${l.distance_miles}mi` : ""}`).join(", ")}` : "No activity logged today"}
+
 TOP NEWS HEADLINES:
 ${headlines.length > 0 ? headlines.map(h => `- ${h}`).join("\n") : "No news feed connected"}
 
-PROJECTS: Batcave Console (v3.6), Omote (mk8.4), Cerebro (mk1.1), Run Recipes, Veritas (incubating)
+PROJECTS: Batcave Console (v5.0), Omote (mk8.5), Cerebro (mk1.1), Run Recipes, Veritas (incubating)
 
 AI USAGE THIS MONTH: $${(monthCost / 100).toFixed(2)}`;
 
@@ -112,6 +120,7 @@ ITEM RULES:
 - mood drives color: urgent=red, warm=amber, neutral=default, positive=green, alert=yellow
 - Write like a chief of staff: "Pack for Seattle — flight Monday." not "You have a trip..."
 - 8-14 items. Most urgent first, FYI last.
+- FITNESS: If fitness goals exist, include a fitness item early in the list. If no activity logged today and there's a daily goal, mark it as mood "alert" with horizon "today" and category "health" with icon_hint "running shoe". If activity was logged, mark it "positive". Track streaks in the text.
 - NEWS: Always include exactly 3 news items at the end as FYI items. Focus on world news and economics/markets. Each should be a single, punchy headline in your voice. Use category "news" and icon_hint "newspaper" or "chart" as appropriate. If live headlines are provided in the context, synthesize from those. If the context says "No news feed connected", generate 3 current world/economics awareness items from your own knowledge — major ongoing stories, market trends, or geopolitical developments. Mark these with mood "neutral".
 - Today's date is ${new Date().toISOString().slice(0, 10)}. Current hour: ${new Date().getHours()}.`,
         messages: [{ role: "user", content: contextStr }],

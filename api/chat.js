@@ -93,6 +93,28 @@ async function executeActions(actions, jwt) {
       } else if (action.type === "delete_event") {
         await supabase.from("batcave_events").delete().eq("id", action.id);
         results.push({ action: "delete_event", ok: true, id: action.id });
+      } else if (action.type === "create_fitness_goal") {
+        const { data } = await supabase.from("batcave_fitness_goals")
+          .insert({
+            title: action.title,
+            category: action.category || "cardio",
+            target_type: action.target_type || "frequency",
+            target_value: action.target_value || 1,
+            target_unit: action.target_unit || "sessions",
+            target_period: action.target_period || "day",
+          }).select().single();
+        results.push({ action: "create_fitness_goal", ok: true, goal: data });
+      } else if (action.type === "log_activity") {
+        const { data } = await supabase.from("batcave_fitness_log")
+          .insert({
+            activity_type: action.activity_type || "run",
+            title: action.title || null,
+            duration_minutes: action.duration_minutes || null,
+            distance_miles: action.distance_miles || null,
+            activity_date: action.activity_date || new Date().toISOString().slice(0, 10),
+            source: "alfred",
+          }).select().single();
+        results.push({ action: "log_activity", ok: true, entry: data });
       }
     } catch (e) {
       results.push({ action: action.type, ok: false, error: e.message });
@@ -117,7 +139,7 @@ export default async function handler(req, res) {
   const context = await getContext();
   const supabase = getServiceClient();
 
-  const systemPrompt = `You are Alfred — Tony's AI assistant inside the Batcave command center. You are concise, direct, and senior-level. You have full awareness of Tony's tasks, calendar, and projects.
+  const systemPrompt = `You are Alfred — Tony's AI assistant inside the Batcave command center. You are concise, direct, and senior-level. You have full awareness of Tony's tasks, calendar, projects, and fitness goals.
 
 ${context || "No context available."}
 
@@ -130,16 +152,19 @@ CAPABILITIES — you can take actions by including a JSON block in your response
   {"type": "delete_task", "id": "task-uuid"},
   {"type": "create_event", "title": "...", "start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD", "category": "personal|professional|travel|health|project", "location": "..."},
   {"type": "update_event", "id": "event-uuid", "title": "...", "start_date": "...", "end_date": "...", "category": "...", "location": "..."},
-  {"type": "delete_event", "id": "event-uuid"}
+  {"type": "delete_event", "id": "event-uuid"},
+  {"type": "create_fitness_goal", "title": "...", "category": "cardio|strength|flexibility|recovery", "target_type": "frequency|duration|distance", "target_value": 1, "target_unit": "sessions|minutes|miles", "target_period": "day|week|month"},
+  {"type": "log_activity", "activity_type": "run|walk|cycle|swim|strength|yoga|other", "title": "...", "duration_minutes": 30, "distance_miles": 3.1, "activity_date": "YYYY-MM-DD"}
 ]
 \`\`\`
 
 RULES:
 - Be concise. No filler.
-- When asked to create/modify/delete/reschedule tasks or events, include the actions block AND a brief confirmation.
+- When asked to create/modify/delete/reschedule tasks, events, or fitness goals, include the actions block AND a brief confirmation.
 - When asked questions, answer from context. Don't guess.
 - Use the task/event IDs from context when referencing existing items.
 - For updates, only include the fields that are changing.
+- For fitness: "set a daily cardio goal" = create_fitness_goal. "I ran 3 miles" or "log my run" = log_activity.
 - Today's date is ${new Date().toISOString().slice(0, 10)}.
 - Dates like "friday", "next tuesday" should resolve to actual YYYY-MM-DD dates.`;
 
