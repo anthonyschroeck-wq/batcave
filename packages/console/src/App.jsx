@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1498,19 +1498,33 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
           {briefItems.map((item, i) => {
             const color = moodColors[item.mood] || C.fog;
             const isUrgent = item.horizon === "now" || item.mood === "urgent";
+            const isNews = item.category === "news";
+            const prevIsNews = i > 0 && briefItems[i - 1].category === "news";
+            const showNewsDivider = isNews && !prevIsNews;
             return (
-              <div key={i} style={{
-                display: "flex", alignItems: "flex-start", gap: isMobile ? "10px" : "16px",
-                padding: isMobile ? "12px 10px" : "14px 16px",
-                borderRadius: "6px",
-                background: isUrgent ? "rgba(154,74,74,0.06)" : i === 0 ? "rgba(123,143,163,0.04)" : "transparent",
-                borderLeft: `2px solid ${color}`,
-                animation: `typeReveal 0.35s ease ${0.06 * i}s both`,
-                transition: "background 0.2s ease",
-              }}
-                onMouseEnter={e => e.currentTarget.style.background = "rgba(123,143,163,0.06)"}
-                onMouseLeave={e => e.currentTarget.style.background = isUrgent ? "rgba(154,74,74,0.06)" : i === 0 ? "rgba(123,143,163,0.04)" : "transparent"}
-              >
+              <React.Fragment key={i}>
+                {showNewsDivider && (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: "10px",
+                    padding: "12px 0 6px",
+                    animation: `typeReveal 0.35s ease ${0.06 * i}s both`,
+                  }}>
+                    <div style={{ fontFamily: F.mono, fontSize: "8px", letterSpacing: "0.1em", color: C.slate, textTransform: "uppercase", flexShrink: 0 }}>World + Markets</div>
+                    <div style={{ flex: 1, height: "1px", background: C.stone }} />
+                  </div>
+                )}
+                <div style={{
+                  display: "flex", alignItems: "flex-start", gap: isMobile ? "10px" : "16px",
+                  padding: isMobile ? "12px 10px" : "14px 16px",
+                  borderRadius: "6px",
+                  background: isUrgent ? "rgba(154,74,74,0.06)" : i === 0 ? "rgba(123,143,163,0.04)" : "transparent",
+                  borderLeft: `2px solid ${color}`,
+                  animation: `typeReveal 0.35s ease ${0.06 * i}s both`,
+                  transition: "background 0.2s ease",
+                }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(123,143,163,0.06)"}
+                  onMouseLeave={e => e.currentTarget.style.background = isUrgent ? "rgba(154,74,74,0.06)" : i === 0 ? "rgba(123,143,163,0.04)" : "transparent"}
+                >
                 {/* Icon */}
                 <div style={{ marginTop: "1px" }}>
                   {iconFor(item.icon_hint, item.mood)}
@@ -1534,6 +1548,7 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
                   whiteSpace: "nowrap",
                 }}>{horizonLabels[item.horizon] || item.horizon?.toUpperCase()}</div>}
               </div>
+              </React.Fragment>
             );
           })}
         </div>
