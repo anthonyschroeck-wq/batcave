@@ -1327,13 +1327,20 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
   // Parse brief content — new format: {greeting, items[]}, fallback to old array or text
   let briefItems = [];
   let briefGreeting = null;
+  let briefQuote = null; // { text, author, source }
   if (brief?.content) {
     try {
       const cleaned = brief.content.replace(/```json\s*|```/g, "").trim();
       const parsed = JSON.parse(cleaned);
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && parsed.items) {
-        // New format: { greeting, items }
         briefGreeting = parsed.greeting || null;
+        if (parsed.quote_text) {
+          briefQuote = {
+            text: parsed.quote_text,
+            author: parsed.quote_author || "Unknown",
+            source: parsed.quote_source || null,
+          };
+        }
         briefItems = Array.isArray(parsed.items) ? parsed.items : [];
       } else if (Array.isArray(parsed)) {
         // Old format: flat array
@@ -1392,16 +1399,79 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
       </div>
 
       {/* Alfred's greeting */}
-      {briefGreeting && (
+      {(briefGreeting || briefQuote) && (
         <div style={{
           marginBottom: "28px",
           animation: "typeReveal 0.5s ease both",
         }}>
-          <div style={{
-            fontFamily: F.display, fontSize: isMobile ? "18px" : "22px",
-            color: C.cream, lineHeight: 1.5, fontWeight: 300,
-            fontStyle: "italic", maxWidth: "640px",
-          }}>{briefGreeting}</div>
+          {briefGreeting && (
+            <div style={{
+              fontFamily: F.display, fontSize: isMobile ? "18px" : "22px",
+              color: C.cream, lineHeight: 1.5, fontWeight: 300,
+              fontStyle: "italic", maxWidth: "640px",
+              marginBottom: briefQuote ? "12px" : 0,
+            }}>{briefGreeting}</div>
+          )}
+          {briefQuote && (
+            <div style={{ position: "relative", display: "inline-block", maxWidth: "640px" }}
+              onMouseEnter={e => {
+                const tip = e.currentTarget.querySelector("[data-tip]");
+                if (tip) tip.style.opacity = "1";
+                if (tip) tip.style.transform = "translateY(0)";
+              }}
+              onMouseLeave={e => {
+                const tip = e.currentTarget.querySelector("[data-tip]");
+                if (tip) tip.style.opacity = "0";
+                if (tip) tip.style.transform = "translateY(4px)";
+              }}
+              onClick={e => {
+                // Mobile: toggle on tap
+                const tip = e.currentTarget.querySelector("[data-tip]");
+                if (tip) {
+                  const showing = tip.style.opacity === "1";
+                  tip.style.opacity = showing ? "0" : "1";
+                  tip.style.transform = showing ? "translateY(4px)" : "translateY(0)";
+                }
+              }}
+            >
+              <span style={{
+                fontFamily: F.body, fontSize: isMobile ? "14px" : "15px",
+                color: C.amber, lineHeight: 1.6, fontWeight: 300,
+                fontStyle: "italic",
+                cursor: "pointer",
+                borderBottom: "1px dotted rgba(123,143,163,0.3)",
+                paddingBottom: "1px",
+              }}>
+                "{briefQuote.text}"
+              </span>
+
+              {/* Attribution tooltip */}
+              <div data-tip="true" style={{
+                position: "absolute",
+                bottom: "calc(100% + 8px)", left: 0,
+                background: C.cavern,
+                border: `1px solid ${C.stone}`,
+                borderRadius: "6px",
+                padding: isMobile ? "10px 14px" : "8px 12px",
+                opacity: 0,
+                transform: "translateY(4px)",
+                transition: "opacity 0.2s ease, transform 0.2s ease",
+                pointerEvents: "none",
+                zIndex: 10,
+                whiteSpace: "nowrap",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+              }}>
+                <div style={{ fontFamily: F.sans, fontSize: "12px", color: C.cream, fontWeight: 500 }}>
+                  {briefQuote.author}
+                </div>
+                {briefQuote.source && (
+                  <div style={{ fontFamily: F.mono, fontSize: "10px", color: C.iron, marginTop: "2px" }}>
+                    {briefQuote.source}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
