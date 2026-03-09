@@ -25,6 +25,7 @@ export default async function handler(req, res) {
 
   // Assemble context
   const weekOut = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  const finnhubKey = await getSecret("finnhub");
 
   const [tasksRes, eventsRes, usageRes] = await Promise.all([
     supabase.from("batcave_tasks").select("*").eq("completed", false).order("due_date"),
@@ -33,6 +34,18 @@ export default async function handler(req, res) {
       .select("cost_cents")
       .gte("created_at", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
   ]);
+
+  // Fetch news headlines if Finnhub is connected
+  let headlines = [];
+  if (finnhubKey) {
+    try {
+      const newsResp = await fetch(`https://finnhub.io/api/v1/news?category=general&token=${finnhubKey}`);
+      if (newsResp.ok) {
+        const articles = await newsResp.json();
+        headlines = (articles || []).slice(0, 8).map(a => `${a.headline} (${a.source})`);
+      }
+    } catch {}
+  }
 
   const tasks = tasksRes.data || [];
   const events = eventsRes.data || [];
@@ -48,7 +61,10 @@ ${overdue.length > 0 ? `OVERDUE: ${overdue.map(t => `${t.title} (was due ${t.due
 CALENDAR (upcoming):
 ${events.slice(0, 10).map(e => `- ${e.title}: ${e.start_date}${e.end_date !== e.start_date ? " to " + e.end_date : ""} [${e.category}]${e.location ? " @ " + e.location : ""}`).join("\n") || "Nothing scheduled"}
 
-PROJECTS: Batcave Console (v3.1), Omote (mk8.4), Cerebro (mk1.1), Run Recipes, Veritas (incubating)
+TOP NEWS HEADLINES:
+${headlines.length > 0 ? headlines.map(h => `- ${h}`).join("\n") : "No news feed connected"}
+
+PROJECTS: Batcave Console (v3.6), Omote (mk8.4), Cerebro (mk1.1), Run Recipes, Veritas (incubating)
 
 AI USAGE THIS MONTH: $${(monthCost / 100).toFixed(2)}`;
 
@@ -68,9 +84,10 @@ AI USAGE THIS MONTH: $${(monthCost / 100).toFixed(2)}`;
 1. A one-line status summary (what kind of day is it — busy, light, travel, etc.)
 2. Top priorities (2-3 bullets, from tasks and calendar)
 3. Flags (overdue items, conflicts, things that need attention)
-4. One-line AI usage note
+4. News digest (1-2 sentence synthesis of the top headlines — what's moving markets, what matters)
+5. One-line AI usage note
 
-Keep it under 150 words. No greetings, no sign-offs. Speak like a senior engineering partner giving a standup.`,
+Keep it under 200 words. No greetings, no sign-offs. Speak like a senior engineering partner giving a standup.`,
         messages: [{ role: "user", content: contextStr }],
       }),
     });
