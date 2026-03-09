@@ -1480,9 +1480,16 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
         display: "flex", justifyContent: "space-between", alignItems: "center",
         marginBottom: "16px",
       }}>
-        <span style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate, letterSpacing: "0.08em" }}>
-          {brief?.brief_date || ""}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate, letterSpacing: "0.08em" }}>
+            {brief?.brief_date || ""}
+          </span>
+          {briefItems.length > 0 && !briefItems.some(it => it.category === "news") && (
+            <span style={{ fontFamily: F.mono, fontSize: "8px", color: C.caution }}>
+              news not loaded — regenerate
+            </span>
+          )}
+        </div>
         <button onClick={() => fetchBrief(true)} disabled={briefLoading} style={{
           background: "transparent",
           border: `1px solid ${C.stone}`, borderRadius: "4px",
