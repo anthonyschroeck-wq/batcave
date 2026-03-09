@@ -1315,13 +1315,21 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
 
   useEffect(() => { fetchBrief(false); }, [fetchBrief]);
 
-  // Parse brief content — it should be JSON array now, fallback to text
+  // Parse brief content — new format: {greeting, items[]}, fallback to old array or text
   let briefItems = [];
+  let briefGreeting = null;
   if (brief?.content) {
     try {
       const cleaned = brief.content.replace(/```json\s*|```/g, "").trim();
-      briefItems = JSON.parse(cleaned);
-      if (!Array.isArray(briefItems)) briefItems = [];
+      const parsed = JSON.parse(cleaned);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && parsed.items) {
+        // New format: { greeting, items }
+        briefGreeting = parsed.greeting || null;
+        briefItems = Array.isArray(parsed.items) ? parsed.items : [];
+      } else if (Array.isArray(parsed)) {
+        // Old format: flat array
+        briefItems = parsed;
+      }
     } catch {
       // Fallback: treat as plain text lines
       briefItems = brief.content.split("\n").filter(l => l.trim()).map(l => ({
@@ -1374,19 +1382,30 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
         <Alfred isMobile={isMobile} session={session} triggerRefresh={triggerRefresh} />
       </div>
 
-      {/* Brief header */}
+      {/* Alfred's greeting */}
+      {briefGreeting && (
+        <div style={{
+          marginBottom: "28px",
+          animation: "typeReveal 0.5s ease both",
+        }}>
+          <div style={{
+            fontFamily: F.display, fontSize: isMobile ? "18px" : "22px",
+            color: C.cream, lineHeight: 1.5, fontWeight: 300,
+            fontStyle: "italic", maxWidth: "640px",
+          }}>{briefGreeting}</div>
+        </div>
+      )}
+
+      {/* Brief controls */}
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
-        marginBottom: "24px",
+        marginBottom: "16px",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <div style={{ width: "16px", height: "16px", color: C.amber }}>{I.bell}</div>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.amber, letterSpacing: "0.08em" }}>
-            {brief?.brief_date ? `BRIEFING / ${brief.brief_date}` : "BRIEFING"}
-          </span>
-        </div>
+        <span style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate, letterSpacing: "0.08em" }}>
+          {brief?.brief_date || ""}
+        </span>
         <button onClick={() => fetchBrief(true)} disabled={briefLoading} style={{
-          background: briefLoading ? "transparent" : C.cavern,
+          background: "transparent",
           border: `1px solid ${C.stone}`, borderRadius: "4px",
           padding: isMobile ? "6px 12px" : "4px 10px",
           fontFamily: F.mono, fontSize: "9px", color: briefLoading ? C.iron : C.amber,
@@ -2071,21 +2090,29 @@ function TasksModule({ isMobile, session, refreshKey }) {
 
   const TaskRow = ({ task, index }) => (
     <div style={{
-      display: "flex", alignItems: "center", gap: "10px",
+      display: "flex", alignItems: "center", gap: isMobile ? "10px" : "12px",
       padding: isMobile ? "10px 0" : "8px 0",
       animation: `fadeUp 0.25s ease ${0.03 * index}s both`,
-      opacity: task.completed ? 0.4 : 1,
+      opacity: task.completed ? 0.35 : 1,
+      transition: "opacity 0.3s ease",
     }}>
-      {/* Checkbox */}
+      {/* Complete button — prominent */}
       <button onClick={() => toggleComplete(task)} style={{
-        width: isMobile ? "24px" : "20px", height: isMobile ? "24px" : "20px", flexShrink: 0,
-        borderRadius: "4px", cursor: "pointer",
-        background: task.completed ? C.success : "transparent",
-        border: `1.5px solid ${task.completed ? C.success : C.slate}`,
+        width: isMobile ? "36px" : "30px", height: isMobile ? "36px" : "30px", flexShrink: 0,
+        borderRadius: "6px", cursor: "pointer",
+        background: task.completed
+          ? C.success
+          : `linear-gradient(135deg, rgba(90,138,106,0.1), rgba(90,138,106,0.05))`,
+        border: `1.5px solid ${task.completed ? C.success : "rgba(90,138,106,0.3)"}`,
         display: "flex", alignItems: "center", justifyContent: "center",
-        color: task.completed ? C.obsidian : "transparent", fontSize: "12px",
-      }}>
-        {task.completed && "✓"}
+        transition: "all 0.25s ease",
+      }}
+        onMouseEnter={e => { if (!task.completed) { e.currentTarget.style.borderColor = C.success; e.currentTarget.style.background = "rgba(90,138,106,0.15)"; }}}
+        onMouseLeave={e => { if (!task.completed) { e.currentTarget.style.borderColor = "rgba(90,138,106,0.3)"; e.currentTarget.style.background = "linear-gradient(135deg, rgba(90,138,106,0.1), rgba(90,138,106,0.05))"; }}}
+      >
+        <svg style={{ width: isMobile ? "16px" : "14px", height: isMobile ? "16px" : "14px", color: task.completed ? C.obsidian : C.success }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
       </button>
 
       {/* Title */}
@@ -2093,6 +2120,7 @@ function TasksModule({ isMobile, session, refreshKey }) {
         flex: 1, fontFamily: F.sans, fontSize: isMobile ? "14px" : "13px",
         color: task.completed ? C.iron : C.parchment,
         textDecoration: task.completed ? "line-through" : "none",
+        transition: "color 0.2s ease",
       }}>{task.title}</div>
 
       {/* Priority badge */}
@@ -2110,7 +2138,11 @@ function TasksModule({ isMobile, session, refreshKey }) {
         color: C.slate, fontSize: "14px", padding: "4px",
         minWidth: isMobile ? "32px" : undefined, minHeight: isMobile ? "32px" : undefined,
         display: "flex", alignItems: "center", justifyContent: "center",
-      }}>x</button>
+        transition: "color 0.2s ease",
+      }}
+        onMouseEnter={e => e.currentTarget.style.color = C.danger}
+        onMouseLeave={e => e.currentTarget.style.color = C.slate}
+      >x</button>
     </div>
   );
 
@@ -2123,6 +2155,51 @@ function TasksModule({ isMobile, session, refreshKey }) {
 
   return (
     <div style={{ animation: "fadeUp 0.4s ease both" }}>
+      {/* Analytics strip */}
+      {tasks.length > 0 && (() => {
+        const completed = tasks.filter(t => t.completed);
+        const open = tasks.filter(t => !t.completed);
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+        const completedThisWeek = completed.filter(t => t.updated_at && t.updated_at >= weekAgo);
+        const createdThisWeek = tasks.filter(t => t.created_at && t.created_at >= weekAgo);
+        const overdueTasks = open.filter(t => t.due_date && t.due_date < todayStr);
+        const completionRate = tasks.length > 0 ? Math.round((completed.length / tasks.length) * 100) : 0;
+
+        // Average time to close (days)
+        const closeTimes = completed.filter(t => t.created_at && t.updated_at).map(t => {
+          const created = new Date(t.created_at).getTime();
+          const closed = new Date(t.updated_at).getTime();
+          return Math.max(0, Math.round((closed - created) / 86400000));
+        });
+        const avgClose = closeTimes.length > 0 ? (closeTimes.reduce((a, b) => a + b, 0) / closeTimes.length).toFixed(1) : "--";
+
+        return (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(6, 1fr)",
+            gap: "8px", marginBottom: "20px",
+          }}>
+            {[
+              { label: "Open", value: open.length, color: C.cream },
+              { label: "Done", value: completed.length, color: C.success },
+              { label: "Rate", value: `${completionRate}%`, color: completionRate > 70 ? C.success : completionRate > 40 ? C.caution : C.danger },
+              { label: "This Week", value: `+${createdThisWeek.length}/-${completedThisWeek.length}`, color: C.amber },
+              { label: "Avg Close", value: `${avgClose}d`, color: C.fog },
+              { label: "Overdue", value: overdueTasks.length, color: overdueTasks.length > 0 ? C.danger : C.success },
+            ].map(s => (
+              <div key={s.label} style={{
+                background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
+                padding: "10px 12px", textAlign: "center",
+              }}>
+                <div style={{ fontFamily: F.display, fontSize: isMobile ? "18px" : "20px", color: s.color, lineHeight: 1, fontWeight: 300 }}>{s.value}</div>
+                <div style={{ fontFamily: F.mono, fontSize: "7px", color: C.iron, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: "4px" }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       {/* Header bar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
         <div style={{ fontFamily: F.mono, fontSize: "10px", color: C.iron }}>
@@ -2235,6 +2312,26 @@ function TasksModule({ isMobile, session, refreshKey }) {
             padding: isMobile ? "8px 14px" : "8px 16px",
           }}>
             {noDue.map((t, i) => <TaskRow key={t.id} task={t} index={i} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Recently completed */}
+      {tasks.filter(t => t.completed).length > 0 && (
+        <div style={{ marginTop: "24px" }}>
+          <div style={{
+            fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.08em",
+            textTransform: "uppercase", color: C.success, marginBottom: "8px",
+            display: "flex", alignItems: "center", gap: "6px",
+          }}>
+            <svg style={{ width: "12px", height: "12px" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
+            Completed ({tasks.filter(t => t.completed).length})
+          </div>
+          <div style={{
+            backgroundColor: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
+            padding: isMobile ? "8px 14px" : "8px 16px",
+          }}>
+            {tasks.filter(t => t.completed).slice(0, 10).map((t, i) => <TaskRow key={t.id} task={t} index={i} />)}
           </div>
         </div>
       )}
@@ -2820,7 +2917,7 @@ export default function BatcaveConsole() {
   ];
 
   const moduleMeta = {
-    home: { title: "Briefing", mono: "Command Center", subtitle: new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) },
+    home: { title: (() => { const h = new Date().getHours(); return h < 12 ? "Good Morning" : h < 17 ? "Good Afternoon" : "Good Evening"; })(), mono: "Alfred", subtitle: new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) },
     command: { title: "Alfred", mono: "AI Assistant", subtitle: "Natural language control" },
     tasks: { title: "Tasks", mono: "Personal Ops", subtitle: "Priority-driven task management" },
     calendar: { title: "Calendar", mono: "Schedule", subtitle: "Personal, professional, and travel — one view" },
@@ -2888,7 +2985,7 @@ export default function BatcaveConsole() {
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v4.2 // batcave</span>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v4.3 // batcave</span>
           {auth.session && (
             <button onClick={auth.signOut} style={{
               background: "none", border: "none", cursor: "pointer",
