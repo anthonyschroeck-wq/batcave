@@ -1093,6 +1093,28 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
   const [time, setTime] = useState(new Date());
   const [editClocks, setEditClocks] = useState(false);
   const [editTickers, setEditTickers] = useState(false);
+  const [ctx, setCtx] = useState(null); // live context: tasks, events
+
+  const headers = session?.access_token
+    ? { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }
+    : { "Content-Type": "application/json" };
+
+  const fetchContext = useCallback(async () => {
+    try {
+      const [tasksRes, eventsRes] = await Promise.all([
+        fetch("/api/tasks", { headers }).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch("/api/events", { headers }).then(r => r.ok ? r.json() : null).catch(() => null),
+      ]);
+      const today = new Date().toISOString().slice(0, 10);
+      const tasks = tasksRes?.tasks || [];
+      const events = (eventsRes?.events || []).filter(e => (e.end_date || e.start_date) >= today);
+      const open = tasks.filter(t => !t.completed);
+      const overdue = open.filter(t => t.due_date && t.due_date < today);
+      const high = open.filter(t => t.priority === "high");
+      const dueToday = open.filter(t => t.due_date === today);
+      setCtx({ tasks, open, overdue, high, dueToday, events, total: tasks.length, completed: tasks.filter(t => t.completed).length });
+    } catch {}
+  }, [session]);
 
   // Configurable widgets — persisted to localStorage
   const CLOCK_CATALOG = [
@@ -1178,7 +1200,8 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchMarkets(); fetchBrief(false); }, [fetchMarkets, fetchBrief]);
+  useEffect(() => { fetchMarkets(); fetchBrief(false); fetchContext(); }, [fetchMarkets, fetchBrief, fetchContext]);
+  useEffect(() => { if (refreshKey > 0) fetchContext(); }, [refreshKey, fetchContext]);
   useEffect(() => { const t = setInterval(() => setTime(new Date()), 30000); return () => clearInterval(t); }, []);
 
   const clockData = CLOCK_CATALOG.filter(c => activeClocks.includes(c.tz));
@@ -1312,73 +1335,202 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
         </div>
       </div>
 
-      {/* AI Briefing */}
+      {/* ── Briefing Dashboard ── */}
       <div style={{ marginBottom: "28px" }}>
+        {/* Status strip */}
+        {ctx && (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)",
+            gap: "10px", marginBottom: "16px",
+          }}>
+            {[
+              {
+                label: "Tasks",
+                value: ctx.open.length,
+                sub: ctx.overdue.length > 0 ? `${ctx.overdue.length} overdue` : "all clear",
+                color: ctx.overdue.length > 0 ? C.danger : C.success,
+                pct: ctx.total > 0 ? Math.round((ctx.completed / ctx.total) * 100) : 0,
+              },
+              {
+                label: "High Priority",
+                value: ctx.high.length,
+                sub: ctx.high.length > 0 ? ctx.high[0].title.slice(0, 20) : "none",
+                color: ctx.high.length > 0 ? C.caution : C.success,
+              },
+              {
+                label: "Due Today",
+                value: ctx.dueToday.length,
+                sub: ctx.dueToday.length > 0 ? ctx.dueToday[0].title.slice(0, 20) : "clear",
+                color: ctx.dueToday.length > 0 ? C.amber : C.iron,
+              },
+              {
+                label: "Events",
+                value: ctx.events.length,
+                sub: ctx.events.length > 0 ? ctx.events[0].title.slice(0, 20) : "nothing upcoming",
+                color: C.amber,
+              },
+            ].map((s, i) => (
+              <div key={s.label} style={{
+                background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "8px",
+                padding: isMobile ? "12px" : "14px 16px",
+                animation: `typeReveal 0.3s ease ${0.06 * i}s both`,
+                position: "relative", overflow: "hidden",
+              }}>
+                {/* Top accent */}
+                <div style={{
+                  position: "absolute", top: 0, left: 0, right: 0, height: "2px",
+                  background: `linear-gradient(90deg, ${s.color}50, transparent)`,
+                }} />
+                <div style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "6px" }}>{s.label}</div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
+                  <span style={{ fontFamily: F.display, fontSize: isMobile ? "26px" : "28px", color: C.cream, fontWeight: 300, lineHeight: 1 }}>{s.value}</span>
+                  {s.pct !== undefined && (
+                    <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron }}>{s.pct}% done</span>
+                  )}
+                </div>
+                <div style={{ fontFamily: F.sans, fontSize: "11px", color: s.color, marginTop: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.sub}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Upcoming timeline */}
+        {ctx?.events.length > 0 && (
+          <div style={{
+            background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "8px",
+            padding: isMobile ? "14px" : "16px 20px", marginBottom: "16px",
+            animation: "typeReveal 0.4s ease 0.15s both",
+          }}>
+            <div style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "10px" }}>Upcoming</div>
+            <div style={{ display: "flex", gap: isMobile ? "10px" : "16px", overflowX: "auto", paddingBottom: "4px" }}>
+              {ctx.events.slice(0, 5).map((ev, i) => {
+                const catColors = { personal: C.amber, professional: "#6A8FA3", travel: "#8A6FA3", health: C.success, project: "#A38A6F" };
+                const evColor = catColors[ev.category] || C.amber;
+                const startD = new Date(ev.start_date + "T00:00:00");
+                return (
+                  <div key={ev.id} style={{
+                    flexShrink: 0, minWidth: isMobile ? "120px" : "140px",
+                    display: "flex", gap: "10px", alignItems: "center",
+                    animation: `typeReveal 0.3s ease ${0.08 * i}s both`,
+                  }}>
+                    {/* Date block */}
+                    <div style={{
+                      width: "38px", height: "38px", borderRadius: "6px",
+                      background: `${evColor}15`, border: `1px solid ${evColor}30`,
+                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0,
+                    }}>
+                      <div style={{ fontFamily: F.mono, fontSize: "7px", color: evColor, textTransform: "uppercase", lineHeight: 1 }}>
+                        {startD.toLocaleDateString("en-US", { month: "short" })}
+                      </div>
+                      <div style={{ fontFamily: F.display, fontSize: "16px", color: C.cream, lineHeight: 1, fontWeight: 400 }}>
+                        {startD.getDate()}
+                      </div>
+                    </div>
+                    {/* Event info */}
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontFamily: F.sans, fontSize: "12px", color: C.parchment, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.title}</div>
+                      {ev.location && <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, marginTop: "2px" }}>{ev.location}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* AI Brief — prose section */}
         {brief?.content ? (
           <div style={{
-            position: "relative", overflow: "hidden", borderRadius: "10px",
-            background: "linear-gradient(135deg, rgba(26,26,36,0.8) 0%, rgba(14,14,22,0.9) 60%, rgba(10,10,16,0.95) 100%)",
-            border: "1px solid rgba(70,70,90,0.25)",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03), 0 4px 32px rgba(0,0,0,0.2)",
+            background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "8px",
+            padding: isMobile ? "16px" : "20px 24px",
+            position: "relative",
+            animation: "fadeUp 0.4s ease both",
           }}>
+            {/* Left accent */}
+            <div style={{
+              position: "absolute", left: 0, top: "16px", bottom: "16px", width: "2px",
+              background: `linear-gradient(180deg, ${C.amber}, transparent)`,
+            }} />
 
-            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "3px",
-              background: `linear-gradient(180deg, ${C.amber}, ${C.amberLight}80, transparent)`, backgroundSize: "100% 200%", animation: "borderFlow 6s ease infinite" }} />
-
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: isMobile ? "18px 20px 0" : "22px 28px 0" }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
-                <span style={{ fontFamily: F.display, fontSize: "15px", color: C.amber, fontStyle: "italic", fontWeight: 300 }}>Briefing</span>
-                <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate }}>{brief.brief_date}</span>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ width: "14px", height: "14px", color: C.amber }}>{I.bell}</div>
+                <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.amber, letterSpacing: "0.06em" }}>ALFRED'S BRIEF</span>
+                <span style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate }}>{brief.brief_date}</span>
               </div>
               <button onClick={() => fetchBrief(true)} disabled={briefLoading} style={{
-                background: "none", border: "none", cursor: "pointer", fontFamily: F.mono, fontSize: "9px", color: C.iron, opacity: briefLoading ? 0.4 : 0.7,
+                background: "none", border: "none", cursor: "pointer",
+                fontFamily: F.mono, fontSize: "9px", color: C.iron, opacity: briefLoading ? 0.4 : 0.7,
               }}>{briefLoading ? "generating..." : "regenerate"}</button>
             </div>
 
-            <div style={{ padding: isMobile ? "14px 20px 18px" : "18px 28px 24px", position: "relative", zIndex: 1 }}>
+            <div>
               {brief.content.split("\n").filter(l => l.trim()).map((line, i) => {
                 const t = line.trim();
-                if (i === 0) return <div key={i} style={{ fontFamily: F.display, fontSize: isMobile ? "20px" : "26px", fontWeight: 300, color: C.cream, lineHeight: 1.3, marginBottom: "16px", animation: `typeReveal 0.4s ease ${0.1*(i+1)}s both` }}>{t}</div>;
+                if (i === 0) return (
+                  <div key={i} style={{
+                    fontFamily: F.body, fontSize: isMobile ? "15px" : "16px",
+                    fontWeight: 400, color: C.cream, lineHeight: 1.5,
+                    marginBottom: "12px",
+                    animation: `typeReveal 0.3s ease ${0.06*(i+1)}s both`,
+                  }}>{t}</div>
+                );
                 if (t.startsWith("-") || t.startsWith("*")) return (
-                  <div key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start", padding: "6px 0", animation: `typeReveal 0.4s ease ${0.08*(i+1)}s both` }}>
-                    <div style={{ width: "4px", height: "4px", borderRadius: "50%", backgroundColor: C.amber, marginTop: "7px", flexShrink: 0, animation: "glowPulse 3s ease infinite" }} />
-                    <span style={{ fontFamily: F.body, fontSize: "13px", color: C.fog, lineHeight: 1.65, fontWeight: 300 }}>{t.replace(/^[-*]\s*/,"")}</span>
+                  <div key={i} style={{
+                    display: "flex", gap: "8px", alignItems: "flex-start",
+                    padding: "4px 0",
+                    animation: `typeReveal 0.3s ease ${0.05*(i+1)}s both`,
+                  }}>
+                    <div style={{ width: "3px", height: "3px", borderRadius: "50%", backgroundColor: C.amber, marginTop: "7px", flexShrink: 0 }} />
+                    <span style={{ fontFamily: F.sans, fontSize: "13px", color: C.fog, lineHeight: 1.55 }}>{t.replace(/^[-*]\s*/,"")}</span>
                   </div>
                 );
-                if (t.endsWith(":") || (t === t.toUpperCase() && t.length < 40)) return <div key={i} style={{ fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.12em", textTransform: "uppercase", color: C.amber, marginTop: "14px", marginBottom: "4px", animation: `typeReveal 0.4s ease ${0.08*(i+1)}s both` }}>{t}</div>;
-                return <div key={i} style={{ fontFamily: F.body, fontSize: "13px", color: C.fog, lineHeight: 1.65, fontWeight: 300, padding: "2px 0", animation: `typeReveal 0.4s ease ${0.08*(i+1)}s both` }}>{t}</div>;
+                if (t.endsWith(":") || (t === t.toUpperCase() && t.length < 40)) return (
+                  <div key={i} style={{
+                    fontFamily: F.mono, fontSize: "8px", letterSpacing: "0.1em",
+                    textTransform: "uppercase", color: C.amber,
+                    marginTop: "12px", marginBottom: "4px",
+                    animation: `typeReveal 0.3s ease ${0.05*(i+1)}s both`,
+                  }}>{t}</div>
+                );
+                return (
+                  <div key={i} style={{
+                    fontFamily: F.sans, fontSize: "13px", color: C.fog,
+                    lineHeight: 1.55, padding: "2px 0",
+                    animation: `typeReveal 0.3s ease ${0.05*(i+1)}s both`,
+                  }}>{t}</div>
+                );
               })}
             </div>
-            {brief.tokens_used && <div style={{ padding: isMobile ? "0 20px 12px" : "0 28px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <div style={{ width: "4px", height: "4px", borderRadius: "50%", backgroundColor: C.success, animation: "breathe 3s ease infinite" }} />
-              <span style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate }}>{brief.tokens_used} tokens</span>
-            </div>}
+
+            {brief.tokens_used && (
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "12px", paddingTop: "10px", borderTop: `1px solid ${C.stone}` }}>
+                <div style={{ width: "3px", height: "3px", borderRadius: "50%", backgroundColor: C.success, animation: "breathe 3s ease infinite" }} />
+                <span style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate }}>{brief.tokens_used} tokens</span>
+              </div>
+            )}
           </div>
         ) : (
           <div style={{
-            borderRadius: "10px", background: `linear-gradient(135deg, ${C.cavern} 0%, ${C.abyss} 100%)`,
-            border: "1px solid rgba(70,70,90,0.25)", padding: isMobile ? "32px 24px" : "40px", textAlign: "center", position: "relative",
+            background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "8px",
+            padding: isMobile ? "28px 20px" : "36px 32px", textAlign: "center",
           }}>
-            <div style={{ fontFamily: F.display, fontSize: isMobile ? "18px" : "22px", color: C.cream, marginBottom: "10px", fontWeight: 300 }}>Your morning brief</div>
-            <div style={{ fontFamily: F.body, fontSize: "13px", color: C.iron, lineHeight: 1.6, marginBottom: "16px" }}>
-              {briefLoading ? "Generating..." : "Connect Anthropic in Integrations, then generate."}
+            <div style={{ width: "24px", height: "24px", color: C.amber, margin: "0 auto 12px", opacity: 0.6 }}>{I.bell}</div>
+            <div style={{ fontFamily: F.display, fontSize: isMobile ? "18px" : "20px", color: C.cream, marginBottom: "8px", fontWeight: 300 }}>Alfred's Briefing</div>
+            <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.iron, lineHeight: 1.6, marginBottom: "16px" }}>
+              {briefLoading ? "Assembling context..." : "Connect Anthropic in Integrations, then generate."}
             </div>
-            {!briefLoading && <button onClick={() => fetchBrief(true)} style={{
-              background: `linear-gradient(135deg, ${C.amber}, ${C.embers})`, border: "none", borderRadius: "6px",
-              padding: "8px 20px", fontFamily: F.mono, fontSize: "11px", fontWeight: 500, color: C.obsidian, cursor: "pointer",
-            }}>generate briefing</button>}
+            {!briefLoading && (
+              <button onClick={() => fetchBrief(true)} style={{
+                background: C.amber, border: "none", borderRadius: "6px",
+                padding: "8px 20px", fontFamily: F.mono, fontSize: "11px", fontWeight: 500,
+                color: C.obsidian, cursor: "pointer", letterSpacing: "0.04em",
+              }}>generate</button>
+            )}
           </div>
         )}
-      </div>
-
-      {/* Weather placeholder */}
-      <div style={{
-        background: "rgba(22,22,32,0.4)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-        border: "1px solid rgba(70,70,90,0.25)", borderRadius: "10px",
-        padding: isMobile ? "16px" : "18px 20px", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)", textAlign: "center",
-      }}>
-        <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, letterSpacing: "0.06em", textTransform: "uppercase" }}>Weather — coming soon</div>
-        <div style={{ fontFamily: F.sans, fontSize: "12px", color: C.slate, marginTop: "6px" }}>OpenWeather integration in next update</div>
       </div>
     </div>
   );
@@ -2784,7 +2936,7 @@ export default function BatcaveConsole() {
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.9 // batcave</span>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v4.0 // batcave</span>
           {auth.session && (
             <button onClick={auth.signOut} style={{
               background: "none", border: "none", cursor: "pointer",
