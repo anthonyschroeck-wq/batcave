@@ -112,7 +112,7 @@ ITEM RULES:
 - mood drives color: urgent=red, warm=amber, neutral=default, positive=green, alert=yellow
 - Write like a chief of staff: "Pack for Seattle — flight Monday." not "You have a trip..."
 - 8-14 items. Most urgent first, FYI last.
-- NEWS: Include exactly 3 news items at the end as FYI items. Focus on world news and economics/markets. Each should be a single, punchy headline rewritten in your voice — not a copy of the source headline. Use category "news" and icon_hint "newspaper" or "chart" as appropriate. If no news headlines are available, skip them.
+- NEWS: Always include exactly 3 news items at the end as FYI items. Focus on world news and economics/markets. Each should be a single, punchy headline in your voice. Use category "news" and icon_hint "newspaper" or "chart" as appropriate. If live headlines are provided in the context, synthesize from those. If the context says "No news feed connected", generate 3 current world/economics awareness items from your own knowledge — major ongoing stories, market trends, or geopolitical developments. Mark these with mood "neutral".
 - Today's date is ${new Date().toISOString().slice(0, 10)}. Current hour: ${new Date().getHours()}.`,
         messages: [{ role: "user", content: contextStr }],
       }),
