@@ -2922,6 +2922,440 @@ function CalendarModule({ isMobile, session, refreshKey }) {
 }
 
 // ─── Placeholder Module ──────────────────────────────────────────
+
+// ─── Agents Module ───────────────────────────────────────────────
+function AgentsModule({ isMobile, session }) {
+  const [view, setView] = useState("dashboard"); // dashboard, catalog, detail
+  const [catalog, setCatalog] = useState([]);
+  const [deployments, setDeployments] = useState([]);
+  const [approvals, setApprovals] = useState([]);
+  const [selectedDep, setSelectedDep] = useState(null);
+  const [runs, setRuns] = useState([]);
+  const [goals, setGoals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [runningId, setRunningId] = useState(null);
+
+  const headers = session?.access_token
+    ? { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }
+    : { "Content-Type": "application/json" };
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/agents", { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setCatalog(data.catalog || []);
+        setDeployments(data.deployments || []);
+        setApprovals(data.approvals || []);
+      }
+    } catch {}
+    setLoading(false);
+  }, [session]);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const fetchDetail = async (dep) => {
+    setSelectedDep(dep);
+    setView("detail");
+    const [runsRes, goalsRes] = await Promise.all([
+      fetch(`/api/agents?action=runs&deployment_id=${dep.id}`, { headers }).then(r => r.json()).catch(() => ({ runs: [] })),
+      fetch(`/api/agents?action=goals&deployment_id=${dep.id}`, { headers }).then(r => r.json()).catch(() => ({ goals: [] })),
+    ]);
+    setRuns(runsRes.runs || []);
+    setGoals(goalsRes.goals || []);
+  };
+
+  const deployAgent = async (catalogId) => {
+    const res = await fetch("/api/agents", { method: "POST", headers, body: JSON.stringify({ action: "deploy", catalog_id: catalogId }) });
+    if (res.ok) { fetchAll(); setView("dashboard"); }
+  };
+
+  const runAgent = async (deploymentId) => {
+    setRunningId(deploymentId);
+    try {
+      const res = await fetch("/api/agents", { method: "POST", headers, body: JSON.stringify({ action: "run", deployment_id: deploymentId }) });
+      if (res.ok) {
+        const data = await res.json();
+        if (selectedDep?.id === deploymentId) fetchDetail(selectedDep);
+        fetchAll();
+      }
+    } catch {}
+    setRunningId(null);
+  };
+
+  const decideApproval = async (approvalId, decision) => {
+    await fetch("/api/agents", { method: "POST", headers, body: JSON.stringify({ action: "decide", approval_id: approvalId, decision }) });
+    fetchAll();
+    if (selectedDep) fetchDetail(selectedDep);
+  };
+
+  const pauseAgent = async (depId, action) => {
+    await fetch("/api/agents", { method: "POST", headers, body: JSON.stringify({ action, deployment_id: depId }) });
+    fetchAll();
+  };
+
+  const levelColors = { 1: C.iron, 2: C.amber, 3: "#6A8FA3", 4: C.success };
+  const levelLabels = { 1: "OBSERVER", 2: "ADVISOR", 3: "EXECUTOR", 4: "AUTONOMOUS" };
+  const levelDescs = {
+    1: "Watches and reports. Zero risk.",
+    2: "Analyzes and recommends. You decide.",
+    3: "Proposes actions. You approve.",
+    4: "Acts within guardrails. You review after.",
+  };
+  const statusColors = { active: C.success, paused: C.caution, retired: C.iron };
+
+  // ─── CATALOG VIEW ────
+  if (view === "catalog") return (
+    <div style={{ animation: "fadeUp 0.4s ease both" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+        <button onClick={() => setView("dashboard")} style={{
+          background: "none", border: "none", cursor: "pointer",
+          fontFamily: F.mono, fontSize: "10px", color: C.amber,
+        }}>back to dashboard</button>
+      </div>
+
+      {/* Maturity model legend */}
+      <div style={{
+        display: "flex", gap: isMobile ? "8px" : "16px", flexWrap: "wrap",
+        marginBottom: "24px", padding: "12px 16px",
+        background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "8px",
+      }}>
+        {[1, 2, 3, 4].map(level => (
+          <div key={level} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <div style={{ width: "8px", height: "8px", borderRadius: "2px", backgroundColor: levelColors[level] }} />
+            <div>
+              <div style={{ fontFamily: F.mono, fontSize: "8px", color: levelColors[level], letterSpacing: "0.06em" }}>L{level} {levelLabels[level]}</div>
+              <div style={{ fontFamily: F.sans, fontSize: "10px", color: C.iron }}>{levelDescs[level]}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Agent cards */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        {catalog.map((agent, i) => {
+          const deployed = deployments.some(d => d.catalog_id === agent.id && d.status !== "retired");
+          return (
+            <div key={agent.id} style={{
+              background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "8px",
+              padding: isMobile ? "16px" : "20px", position: "relative", overflow: "hidden",
+              animation: `fadeUp 0.3s ease ${0.04 * i}s both`,
+            }}>
+              <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: "3px", backgroundColor: levelColors[agent.level] }} />
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                    <span style={{ fontFamily: F.sans, fontSize: isMobile ? "15px" : "14px", fontWeight: 600, color: C.cream }}>{agent.name}</span>
+                    <span style={{ fontFamily: F.mono, fontSize: "7px", padding: "2px 6px", borderRadius: "3px", backgroundColor: `${levelColors[agent.level]}15`, color: levelColors[agent.level], border: `1px solid ${levelColors[agent.level]}30` }}>
+                      L{agent.level} {agent.level_label?.toUpperCase()}
+                    </span>
+                  </div>
+                  <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate }}>
+                    {agent.integrations?.join(" + ")} {agent.schedule_default ? `/ ${agent.schedule_default}` : "/ on-demand"}
+                  </div>
+                </div>
+                {!deployed ? (
+                  <button onClick={() => deployAgent(agent.id)} style={{
+                    background: C.amber, border: "none", borderRadius: "4px",
+                    padding: isMobile ? "8px 14px" : "5px 12px",
+                    fontFamily: F.mono, fontSize: "10px", fontWeight: 600,
+                    color: C.obsidian, cursor: "pointer",
+                    minHeight: isMobile ? "36px" : undefined,
+                  }}>deploy</button>
+                ) : (
+                  <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.success }}>deployed</span>
+                )}
+              </div>
+
+              <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.fog, lineHeight: 1.5 }}>{agent.description}</div>
+
+              {agent.estimated_cost_cents > 0 && (
+                <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, marginTop: "6px" }}>
+                  ~${(agent.estimated_cost_cents / 100).toFixed(2)}/run
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  // ─── DETAIL VIEW ────
+  if (view === "detail" && selectedDep) {
+    const agent = selectedDep.catalog || {};
+    return (
+      <div style={{ animation: "fadeUp 0.4s ease both" }}>
+        <button onClick={() => { setView("dashboard"); setSelectedDep(null); }} style={{
+          background: "none", border: "none", cursor: "pointer",
+          fontFamily: F.mono, fontSize: "10px", color: C.amber, marginBottom: "20px",
+        }}>back to dashboard</button>
+
+        {/* Agent header */}
+        <div style={{
+          background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "8px",
+          padding: isMobile ? "16px" : "20px", marginBottom: "20px",
+          position: "relative", overflow: "hidden",
+        }}>
+          <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: "3px", backgroundColor: levelColors[agent.level] }} />
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+            <div>
+              <div style={{ fontFamily: F.sans, fontSize: "16px", fontWeight: 600, color: C.cream }}>{agent.name}</div>
+              <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, marginTop: "2px" }}>
+                {selectedDep.total_runs || 0} runs / ${(parseFloat(selectedDep.total_cost_cents || 0) / 100).toFixed(2)} spent
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button onClick={() => runAgent(selectedDep.id)} disabled={runningId === selectedDep.id} style={{
+                background: C.amber, border: "none", borderRadius: "4px",
+                padding: isMobile ? "8px 14px" : "6px 14px",
+                fontFamily: F.mono, fontSize: "10px", fontWeight: 600,
+                color: C.obsidian, cursor: "pointer",
+                opacity: runningId === selectedDep.id ? 0.5 : 1,
+                minHeight: isMobile ? "36px" : undefined,
+              }}>{runningId === selectedDep.id ? "running..." : "run now"}</button>
+              <button onClick={() => pauseAgent(selectedDep.id, selectedDep.status === "active" ? "pause" : "resume")} style={{
+                background: "none", border: `1px solid ${C.stone}`, borderRadius: "4px",
+                padding: isMobile ? "8px 10px" : "6px 10px",
+                fontFamily: F.mono, fontSize: "10px", color: C.iron, cursor: "pointer",
+                minHeight: isMobile ? "36px" : undefined,
+              }}>{selectedDep.status === "active" ? "pause" : "resume"}</button>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <div style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: statusColors[selectedDep.status] || C.iron }} />
+            <span style={{ fontFamily: F.mono, fontSize: "9px", color: statusColors[selectedDep.status] || C.iron }}>{selectedDep.status}</span>
+            {selectedDep.last_run_at && <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate }}> / last run {new Date(selectedDep.last_run_at).toLocaleString()}</span>}
+          </div>
+        </div>
+
+        {/* Pending approvals for this agent */}
+        {approvals.filter(a => a.deployment_id === selectedDep.id).length > 0 && (
+          <div style={{ marginBottom: "20px" }}>
+            <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.caution, letterSpacing: "0.08em", marginBottom: "8px" }}>PENDING APPROVAL</div>
+            {approvals.filter(a => a.deployment_id === selectedDep.id).map(a => (
+              <div key={a.id} style={{
+                background: "rgba(184,146,74,0.06)", border: "1px solid rgba(184,146,74,0.2)",
+                borderRadius: "6px", padding: isMobile ? "12px" : "12px 16px", marginBottom: "6px",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                gap: "10px", flexWrap: "wrap",
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.parchment }}>{a.description}</div>
+                  <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, marginTop: "2px" }}>{a.action_type}</div>
+                </div>
+                <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                  <button onClick={() => decideApproval(a.id, "approve")} style={{
+                    background: C.success, border: "none", borderRadius: "4px",
+                    padding: isMobile ? "8px 12px" : "4px 10px",
+                    fontFamily: F.mono, fontSize: "10px", color: C.obsidian, cursor: "pointer",
+                    fontWeight: 600, minHeight: isMobile ? "36px" : undefined,
+                  }}>approve</button>
+                  <button onClick={() => decideApproval(a.id, "reject")} style={{
+                    background: "none", border: `1px solid ${C.stone}`, borderRadius: "4px",
+                    padding: isMobile ? "8px 12px" : "4px 10px",
+                    fontFamily: F.mono, fontSize: "10px", color: C.iron, cursor: "pointer",
+                    minHeight: isMobile ? "36px" : undefined,
+                  }}>reject</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Run history */}
+        <div style={{ marginBottom: "20px" }}>
+          <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.08em", marginBottom: "8px" }}>RUN HISTORY</div>
+          {runs.length === 0 && <div style={{ fontFamily: F.sans, fontSize: "12px", color: C.iron }}>No runs yet. Hit "run now" to start.</div>}
+          {runs.map((r, i) => (
+            <div key={r.id} style={{
+              padding: "10px 0", borderBottom: `1px solid ${C.stone}`,
+              animation: `fadeUp 0.2s ease ${0.03 * i}s both`,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div style={{
+                    width: "6px", height: "6px", borderRadius: "50%",
+                    backgroundColor: r.status === "completed" ? C.success : r.status === "failed" ? C.danger : r.status === "pending_approval" ? C.caution : C.iron,
+                  }} />
+                  <span style={{ fontFamily: F.mono, fontSize: "10px", color: C.fog }}>{r.status}</span>
+                  <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate }}>{r.trigger_type}</span>
+                </div>
+                <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate }}>{new Date(r.started_at).toLocaleString()}</span>
+              </div>
+              {r.summary && <div style={{ fontFamily: F.sans, fontSize: "12px", color: C.fog, marginTop: "4px", lineHeight: 1.5 }}>{r.summary}</div>}
+              {r.error && <div style={{ fontFamily: F.mono, fontSize: "11px", color: C.danger, marginTop: "4px" }}>{r.error}</div>}
+            </div>
+          ))}
+        </div>
+
+        {/* Goals */}
+        {goals.length > 0 && (
+          <div>
+            <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.08em", marginBottom: "8px" }}>GOALS</div>
+            {goals.map(g => (
+              <div key={g.id} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "8px 0", borderBottom: `1px solid ${C.stone}`,
+              }}>
+                <span style={{ fontFamily: F.sans, fontSize: "13px", color: C.parchment }}>{g.title}</span>
+                <span style={{
+                  fontFamily: F.mono, fontSize: "9px", padding: "2px 8px", borderRadius: "3px",
+                  color: g.status === "met" ? C.success : g.status === "missed" ? C.danger : C.amber,
+                  border: `1px solid ${g.status === "met" ? C.success : g.status === "missed" ? C.danger : C.amber}30`,
+                }}>{g.status}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ─── DASHBOARD VIEW (default) ────
+  return (
+    <div style={{ animation: "fadeUp 0.4s ease both" }}>
+      {/* Stats strip */}
+      <div style={{
+        display: "grid", gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(4, 1fr)",
+        gap: "10px", marginBottom: "24px",
+      }}>
+        {[
+          { label: "Active", value: deployments.filter(d => d.status === "active").length, color: C.success },
+          { label: "Paused", value: deployments.filter(d => d.status === "paused").length, color: C.caution },
+          { label: "Pending", value: approvals.length, color: approvals.length > 0 ? C.amber : C.iron },
+          { label: "Total Runs", value: deployments.reduce((s, d) => s + (d.total_runs || 0), 0), color: C.fog },
+        ].map(s => (
+          <div key={s.label} style={{
+            background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
+            padding: "10px 12px", textAlign: "center",
+          }}>
+            <div style={{ fontFamily: F.display, fontSize: isMobile ? "22px" : "24px", color: s.color, lineHeight: 1, fontWeight: 300 }}>{s.value}</div>
+            <div style={{ fontFamily: F.mono, fontSize: "7px", color: C.iron, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: "4px" }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Pending approvals — prominent */}
+      {approvals.length > 0 && (
+        <div style={{ marginBottom: "24px" }}>
+          <div style={{
+            fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.08em", color: C.caution,
+            display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px",
+          }}>
+            <div style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: C.caution, animation: "breathe 2s ease infinite" }} />
+            {approvals.length} ACTION{approvals.length > 1 ? "S" : ""} AWAITING YOUR APPROVAL
+          </div>
+          {approvals.map(a => (
+            <div key={a.id} style={{
+              background: "rgba(184,146,74,0.06)", border: "1px solid rgba(184,146,74,0.2)",
+              borderRadius: "6px", padding: isMobile ? "12px" : "12px 16px", marginBottom: "6px",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              gap: "10px", flexWrap: "wrap",
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.parchment }}>{a.description}</div>
+                <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, marginTop: "2px" }}>{a.action_type}</div>
+              </div>
+              <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                <button onClick={() => decideApproval(a.id, "approve")} style={{
+                  background: C.success, border: "none", borderRadius: "4px",
+                  padding: isMobile ? "8px 12px" : "4px 10px",
+                  fontFamily: F.mono, fontSize: "10px", color: C.obsidian, cursor: "pointer",
+                  fontWeight: 600, minHeight: isMobile ? "36px" : undefined,
+                }}>approve</button>
+                <button onClick={() => decideApproval(a.id, "reject")} style={{
+                  background: "none", border: `1px solid ${C.stone}`, borderRadius: "4px",
+                  padding: isMobile ? "8px 12px" : "4px 10px",
+                  fontFamily: F.mono, fontSize: "10px", color: C.iron, cursor: "pointer",
+                  minHeight: isMobile ? "36px" : undefined,
+                }}>reject</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Deployed agents */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+        <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.08em" }}>DEPLOYED AGENTS</div>
+        <button onClick={() => setView("catalog")} style={{
+          background: C.amber, border: "none", borderRadius: "4px",
+          padding: isMobile ? "8px 14px" : "5px 12px",
+          fontFamily: F.mono, fontSize: "10px", fontWeight: 600,
+          color: C.obsidian, cursor: "pointer",
+          minHeight: isMobile ? "36px" : undefined,
+        }}>+ browse catalog</button>
+      </div>
+
+      {deployments.length === 0 && !loading && (
+        <div style={{
+          textAlign: "center", padding: isMobile ? "40px 20px" : "60px 40px",
+          background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "8px",
+        }}>
+          <div style={{ fontFamily: F.display, fontSize: isMobile ? "18px" : "22px", color: C.cream, fontWeight: 300, marginBottom: "8px" }}>No agents deployed yet</div>
+          <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.iron, lineHeight: 1.6, maxWidth: "400px", margin: "0 auto 16px" }}>
+            Agents watch your systems, analyze patterns, and propose actions on your behalf. Start with an Observer — zero risk, pure visibility.
+          </div>
+          <button onClick={() => setView("catalog")} style={{
+            background: C.amber, border: "none", borderRadius: "6px",
+            padding: "10px 24px", fontFamily: F.mono, fontSize: "11px", fontWeight: 500,
+            color: C.obsidian, cursor: "pointer",
+          }}>explore the catalog</button>
+        </div>
+      )}
+
+      {deployments.map((dep, i) => {
+        const agent = dep.catalog || {};
+        const depApprovals = approvals.filter(a => a.deployment_id === dep.id);
+        return (
+          <div key={dep.id} onClick={() => fetchDetail(dep)} style={{
+            background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "8px",
+            padding: isMobile ? "14px" : "16px 20px", marginBottom: "8px",
+            cursor: "pointer", position: "relative", overflow: "hidden",
+            animation: `fadeUp 0.3s ease ${0.04 * i}s both`,
+            transition: "border-color 0.2s ease",
+          }}
+            onMouseEnter={e => e.currentTarget.style.borderColor = C.amber + "40"}
+            onMouseLeave={e => e.currentTarget.style.borderColor = C.stone}
+          >
+            <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: "3px", backgroundColor: levelColors[agent.level] }} />
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontFamily: F.sans, fontSize: "14px", fontWeight: 500, color: C.cream }}>{agent.name || dep.catalog_id}</span>
+                  <div style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: statusColors[dep.status] || C.iron }} />
+                </div>
+                <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, marginTop: "2px" }}>
+                  {dep.total_runs || 0} runs
+                  {dep.last_run_at && ` / last ${new Date(dep.last_run_at).toLocaleDateString()}`}
+                  {depApprovals.length > 0 && <span style={{ color: C.caution }}> / {depApprovals.length} pending</span>}
+                </div>
+              </div>
+              <button onClick={e => { e.stopPropagation(); runAgent(dep.id); }} disabled={runningId === dep.id || dep.status !== "active"} style={{
+                background: "none", border: `1px solid ${dep.status === "active" ? C.amber : C.stone}`, borderRadius: "4px",
+                padding: isMobile ? "8px 12px" : "4px 10px",
+                fontFamily: F.mono, fontSize: "10px",
+                color: dep.status === "active" ? C.amber : C.iron,
+                cursor: dep.status === "active" ? "pointer" : "not-allowed",
+                opacity: runningId === dep.id ? 0.5 : 1,
+                minHeight: isMobile ? "36px" : undefined,
+              }}>{runningId === dep.id ? "..." : "run"}</button>
+            </div>
+          </div>
+        );
+      })}
+
+      {loading && deployments.length === 0 && <div style={{ fontFamily: F.mono, fontSize: "11px", color: C.iron, textAlign: "center", padding: "20px" }}>Loading agents...</div>}
+    </div>
+  );
+}
+
 function PlaceholderModule({ description, items, isMobile }) {
   return (
     <div style={{ animation: "fadeUp 0.4s ease both" }}>
@@ -3025,21 +3459,11 @@ export default function BatcaveConsole() {
     news: { title: "News", mono: "Headlines", subtitle: "Market news and global events" },
     finance: { title: "Finance", mono: "Markets", subtitle: "Indices, quotes, and market data" },
     projects: { title: "Projects", mono: "System Registry", subtitle: `${manifest.projects.length} registered across the system` },
-    agents: { title: "Agents", mono: "Autonomous Systems", subtitle: "Build and manage autonomous workflows" },
+    agents: { title: "Agents", mono: "Autonomous Systems", subtitle: "Deploy, monitor, and govern your AI workforce" },
     integrations: { title: "Integrations", mono: "Admin", subtitle: "Manage service connections" },
   };
 
-  const placeholders = {
-    agents: {
-      description: "Autonomous agents that run scheduled code pushes, monitor repos, and execute workflows. Governed through intent, not interruption.",
-      items: [
-        { label: "Scheduled", title: "Code Deployer", desc: "Automated pushes on cron" },
-        { label: "Monitor", title: "Repo Watcher", desc: "Track downstream changes" },
-        { label: "Pipeline", title: "CI Orchestrator", desc: "Cross-package builds" },
-        { label: "Research", title: "Scout", desc: "Surface signals from feeds" },
-      ],
-    },
-  };
+  const placeholders = {};
 
   const meta = moduleMeta[activeModule];
 
@@ -3086,7 +3510,7 @@ export default function BatcaveConsole() {
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v4.4 // batcave</span>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v5.0 // batcave</span>
           {auth.session && (
             <button onClick={auth.signOut} style={{
               background: "none", border: "none", cursor: "pointer",
@@ -3437,7 +3861,8 @@ export default function BatcaveConsole() {
             {activeModule === "finance" && <FinanceModule isMobile={isMobile} />}
             {activeModule === "projects" && <ProjectsModule isMobile={isMobile} liveData={liveData} />}
             {activeModule === "integrations" && <IntegrationsModule isMobile={isMobile} liveData={liveData} session={auth.session} />}
-            {!["home","command","tasks","calendar","news","finance","projects","integrations"].includes(activeModule) && placeholders[activeModule] && (
+            {activeModule === "agents" && <AgentsModule isMobile={isMobile} session={auth.session} />}
+            {!["home","command","tasks","calendar","news","finance","projects","integrations","agents"].includes(activeModule) && placeholders[activeModule] && (
               <PlaceholderModule description={placeholders[activeModule].description} items={placeholders[activeModule].items} isMobile={isMobile} />
             )}
           </div>
