@@ -678,11 +678,13 @@ function CommandBar({ onClose, isMobile, session, onAction }) {
           <div style={{ padding: "10px 20px 14px", display: "flex", gap: "6px", flexWrap: "wrap" }}>
             {["add task", "what's overdue?", "schedule event", "brief me"].map(hint => (
               <button key={hint} onClick={() => { setInput(hint); inputRef.current?.focus(); }} style={{
-                background: "transparent", border: `1px solid ${C.stone}`, borderRadius: "3px",
-                padding: "4px 10px", fontFamily: F.mono, fontSize: "9px",
+                background: "transparent", border: `1px solid ${C.stone}`, borderRadius: "4px",
+                padding: isMobile ? "8px 12px" : "4px 10px",
+                fontFamily: F.mono, fontSize: isMobile ? "11px" : "9px",
                 color: C.iron, cursor: "pointer",
                 transition: "all 0.2s ease",
                 letterSpacing: "0.02em",
+                minHeight: isMobile ? "36px" : undefined,
               }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = C.amber; e.currentTarget.style.color = C.fog; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = C.stone; e.currentTarget.style.color = C.iron; }}
@@ -1087,10 +1089,8 @@ function Alfred({ isMobile, session, triggerRefresh }) {
       }}>
         <div style={{
           flex: 1, display: "flex", alignItems: "center", gap: "8px",
-          background: "rgba(22,22,32,0.4)", backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
+          background: "rgba(22,22,32,0.4)",
           border: "1px solid rgba(70,70,90,0.25)", borderRadius: "8px",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
           padding: isMobile ? "10px 14px" : "8px 14px",
           transition: "border-color 0.2s ease",
         }}>
@@ -1206,11 +1206,14 @@ function TickerBar({ isMobile }) {
   return (
     <>
       <div style={{
-        height: "28px", display: "flex", alignItems: "center",
-        background: "rgba(14,14,20,0.85)",
+        height: isMobile ? "32px" : "28px", display: "flex", alignItems: "center",
+        background: "rgba(14,14,20,0.92)",
         borderBottom: "1px solid rgba(50,50,65,0.3)",
-        fontFamily: F.mono, fontSize: "10px",
-        position: "relative", zIndex: 40, flexShrink: 0,
+        fontFamily: F.mono, fontSize: isMobile ? "11px" : "10px",
+        position: isMobile ? "fixed" : "relative",
+        top: isMobile ? "56px" : undefined,
+        left: isMobile ? 0 : undefined, right: isMobile ? 0 : undefined,
+        zIndex: isMobile ? 49 : 40, flexShrink: 0,
         overflow: "hidden",
       }}>
         {/* Scrolling content */}
@@ -1245,11 +1248,13 @@ function TickerBar({ isMobile }) {
 
         {/* Config toggle */}
         <button onClick={() => setShowConfig(!showConfig)} style={{
-          position: "absolute", right: "6px", top: "50%", transform: "translateY(-50%)",
+          position: "absolute", right: isMobile ? "4px" : "6px", top: "50%", transform: "translateY(-50%)",
           background: "none", border: "none", cursor: "pointer",
-          color: showConfig ? C.amber : C.slate, fontSize: "10px",
-          padding: "2px 4px",
-        }}>{showConfig ? "x" : I.settings ? "..." : "..."}</button>
+          color: showConfig ? C.amber : C.slate, fontSize: isMobile ? "14px" : "10px",
+          padding: isMobile ? "8px" : "2px 4px",
+          minWidth: isMobile ? "36px" : undefined, minHeight: isMobile ? "32px" : undefined,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>{showConfig ? "x" : "..."}</button>
       </div>
 
       {/* Config panel */}
@@ -1268,7 +1273,9 @@ function TickerBar({ isMobile }) {
                 const on = activeClocks.includes(c.tz);
                 return <button key={c.tz} onClick={() => toggle(activeClocks, setActiveClocks, "bc_clocks", c.tz)} style={{
                   background: on ? "rgba(123,143,163,0.15)" : "transparent", border: `1px solid ${on ? C.amber : C.stone}`,
-                  borderRadius: "3px", padding: "2px 6px", fontFamily: F.mono, fontSize: "8px", color: on ? C.cream : C.iron, cursor: "pointer",
+                  borderRadius: "4px", padding: isMobile ? "6px 10px" : "3px 8px",
+                  fontFamily: F.mono, fontSize: isMobile ? "11px" : "9px", color: on ? C.cream : C.iron, cursor: "pointer",
+                  minHeight: isMobile ? "36px" : undefined,
                 }}>{c.label}</button>;
               })}
             </div>
@@ -1280,7 +1287,9 @@ function TickerBar({ isMobile }) {
                 const on = activeTickers.includes(t.symbol);
                 return <button key={t.symbol} onClick={() => toggle(activeTickers, setActiveTickers, "bc_tickers", t.symbol)} style={{
                   background: on ? "rgba(123,143,163,0.15)" : "transparent", border: `1px solid ${on ? C.amber : C.stone}`,
-                  borderRadius: "3px", padding: "2px 6px", fontFamily: F.mono, fontSize: "8px", color: on ? C.cream : C.iron, cursor: "pointer",
+                  borderRadius: "4px", padding: isMobile ? "6px 10px" : "3px 8px",
+                  fontFamily: F.mono, fontSize: isMobile ? "11px" : "9px", color: on ? C.cream : C.iron, cursor: "pointer",
+                  minHeight: isMobile ? "36px" : undefined,
                 }}>{t.symbol}</button>;
               })}
             </div>
@@ -1421,8 +1430,8 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
             const isUrgent = item.horizon === "now" || item.mood === "urgent";
             return (
               <div key={i} style={{
-                display: "flex", alignItems: "flex-start", gap: isMobile ? "12px" : "16px",
-                padding: isMobile ? "14px 12px" : "14px 16px",
+                display: "flex", alignItems: "flex-start", gap: isMobile ? "10px" : "16px",
+                padding: isMobile ? "12px 10px" : "14px 16px",
                 borderRadius: "6px",
                 background: isUrgent ? "rgba(154,74,74,0.06)" : i === 0 ? "rgba(123,143,163,0.04)" : "transparent",
                 borderLeft: `2px solid ${color}`,
@@ -1447,13 +1456,13 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
                 </div>
 
                 {/* Horizon tag */}
-                <div style={{
+                {!isMobile && <div style={{
                   fontFamily: F.mono, fontSize: "7px", letterSpacing: "0.08em",
                   color, padding: "2px 6px", borderRadius: "2px",
                   border: `1px solid ${color}25`,
                   flexShrink: 0, marginTop: "3px",
                   whiteSpace: "nowrap",
-                }}>{horizonLabels[item.horizon] || item.horizon?.toUpperCase()}</div>
+                }}>{horizonLabels[item.horizon] || item.horizon?.toUpperCase()}</div>}
               </div>
             );
           })}
@@ -2601,10 +2610,10 @@ function CalendarModule({ isMobile, session, refreshKey }) {
         display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px",
       }}>
         <button onClick={prevMonth} style={{
-          background: "none", border: `1px solid ${C.slate}`, borderRadius: "4px",
-          padding: isMobile ? "8px 12px" : "4px 10px", cursor: "pointer",
-          fontFamily: F.mono, fontSize: "12px", color: C.fog,
-          minHeight: isMobile ? "40px" : undefined,
+          background: "none", border: `1px solid ${C.slate}`, borderRadius: "6px",
+          padding: isMobile ? "10px 16px" : "4px 10px", cursor: "pointer",
+          fontFamily: F.mono, fontSize: isMobile ? "13px" : "12px", color: C.fog,
+          minHeight: isMobile ? "44px" : undefined,
         }}>prev</button>
         <div style={{ flex: 1, textAlign: "center" }}>
           <span style={{ fontFamily: F.display, fontSize: isMobile ? "22px" : "24px", color: C.cream }}>
@@ -2613,16 +2622,16 @@ function CalendarModule({ isMobile, session, refreshKey }) {
           <span style={{ fontFamily: F.mono, fontSize: "12px", color: C.iron, marginLeft: "8px" }}>{year}</span>
         </div>
         <button onClick={goToday} style={{
-          background: "none", border: `1px solid ${C.slate}`, borderRadius: "4px",
-          padding: isMobile ? "8px 12px" : "4px 10px", cursor: "pointer",
-          fontFamily: F.mono, fontSize: "11px", color: C.amber,
-          minHeight: isMobile ? "40px" : undefined,
+          background: "none", border: `1px solid ${C.slate}`, borderRadius: "6px",
+          padding: isMobile ? "10px 16px" : "4px 10px", cursor: "pointer",
+          fontFamily: F.mono, fontSize: isMobile ? "13px" : "11px", color: C.amber,
+          minHeight: isMobile ? "44px" : undefined,
         }}>today</button>
         <button onClick={nextMonth} style={{
-          background: "none", border: `1px solid ${C.slate}`, borderRadius: "4px",
-          padding: isMobile ? "8px 12px" : "4px 10px", cursor: "pointer",
-          fontFamily: F.mono, fontSize: "12px", color: C.fog,
-          minHeight: isMobile ? "40px" : undefined,
+          background: "none", border: `1px solid ${C.slate}`, borderRadius: "6px",
+          padding: isMobile ? "10px 16px" : "4px 10px", cursor: "pointer",
+          fontFamily: F.mono, fontSize: isMobile ? "13px" : "12px", color: C.fog,
+          minHeight: isMobile ? "44px" : undefined,
         }}>next</button>
       </div>
 
@@ -2707,7 +2716,7 @@ function CalendarModule({ isMobile, session, refreshKey }) {
         {/* Day cells */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
           {cells.map((day, i) => {
-            if (day === null) return <div key={`empty-${i}`} style={{ minHeight: isMobile ? "60px" : "80px", backgroundColor: C.obsidian, borderBottom: `1px solid ${C.stone}`, borderRight: `1px solid ${C.stone}` }} />;
+            if (day === null) return <div key={`empty-${i}`} style={{ minHeight: isMobile ? "52px" : "80px", backgroundColor: C.obsidian, borderBottom: `1px solid ${C.stone}`, borderRight: `1px solid ${C.stone}` }} />;
 
             const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
             const isToday = dateStr === todayStr;
@@ -2715,7 +2724,7 @@ function CalendarModule({ isMobile, session, refreshKey }) {
 
             return (
               <div key={dateStr} style={{
-                minHeight: isMobile ? "60px" : "80px",
+                minHeight: isMobile ? "52px" : "80px",
                 padding: isMobile ? "4px" : "4px 6px",
                 borderBottom: `1px solid ${C.stone}`,
                 borderRight: `1px solid ${C.stone}`,
@@ -2985,7 +2994,7 @@ export default function BatcaveConsole() {
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v4.3 // batcave</span>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v4.4 // batcave</span>
           {auth.session && (
             <button onClick={auth.signOut} style={{
               background: "none", border: "none", cursor: "pointer",
@@ -3088,7 +3097,7 @@ export default function BatcaveConsole() {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: ${C.slate}; border-radius: 2px; }
         ::-webkit-scrollbar-thumb:hover { background: ${C.iron}; }
-        button { font-family: inherit; }
+        button { font-family: inherit; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
         html { -webkit-text-size-adjust: 100%; }
         input:focus { border-color: ${C.amber} !important; }
         select:focus { border-color: ${C.amber} !important; }
@@ -3211,7 +3220,7 @@ export default function BatcaveConsole() {
         {/* ── MOBILE DRAWER BACKDROP ── */}
         {isMobile && drawerOpen && (
           <div onClick={() => setDrawerOpen(false)} style={{
-            position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)",
+            position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", WebkitTapHighlightColor: "transparent",
             backdropFilter: "blur(4px)", zIndex: 100,
             animation: "fadeIn 0.15s ease",
           }} />
@@ -3289,7 +3298,7 @@ export default function BatcaveConsole() {
         {/* ── MAIN CONTENT ── */}
         <main style={{
           flex: 1, overflow: "auto", position: "relative", zIndex: 1,
-          padding: isMobile ? "72px 20px 32px" : "40px 48px",
+          padding: isMobile ? "100px 16px 40px" : "40px 48px",
         }}>
           {/* Module header */}
           <div key={activeModule} style={{ marginBottom: isMobile ? "24px" : "40px", animation: "fadeUp 0.4s cubic-bezier(0.22,1,0.36,1) both" }}>
