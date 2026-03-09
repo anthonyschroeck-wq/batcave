@@ -3203,7 +3203,7 @@ export default function BatcaveConsole() {
 
             {/* Title */}
             <div style={{ flex: 1 }}>
-              <span style={{ fontFamily: F.display, fontSize: "18px", color: C.cream }}>{meta.title}</span>
+              <span style={{ fontFamily: F.display, fontSize: "18px", color: C.cream }}>{activeModule === "home" ? "Batcave" : meta.title}</span>
             </div>
 
             {/* Command button */}
@@ -3298,37 +3298,43 @@ export default function BatcaveConsole() {
         {/* ── MAIN CONTENT ── */}
         <main style={{
           flex: 1, overflow: "auto", position: "relative", zIndex: 1,
-          padding: isMobile ? "100px 16px 40px" : "40px 48px",
+          padding: isMobile
+            ? (activeModule === "home" ? "92px 16px 40px" : "100px 16px 40px")
+            : (activeModule === "home" ? "28px 48px" : "40px 48px"),
         }}>
-          {/* Module header */}
-          <div key={activeModule} style={{ marginBottom: isMobile ? "24px" : "40px", animation: "fadeUp 0.4s cubic-bezier(0.22,1,0.36,1) both" }}>
-            <div style={{
-              fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.16em",
-              textTransform: "uppercase", color: C.amber, marginBottom: "10px",
-              animation: "typeReveal 0.5s ease 0.1s both",
-            }}>{meta.mono}</div>
-            {!isMobile && (
-              <h1 style={{
-                fontFamily: F.display, fontSize: "48px", fontWeight: 300,
-                color: C.cream, lineHeight: 1.05, marginBottom: "8px", letterSpacing: "-0.02em",
-                textShadow: "0 0 20px rgba(123,143,163,0.06)",
-                animation: "typeReveal 0.5s ease 0.15s both",
-              }}>{meta.title}</h1>
-            )}
-            <p style={{
-              fontFamily: F.body, fontSize: isMobile ? "14px" : "15px", fontWeight: 300,
-              color: C.iron, fontStyle: "italic",
-              animation: "typeReveal 0.5s ease 0.2s both",
-            }}>{meta.subtitle}</p>
-          </div>
+          {/* Module header — hidden on Home (Alfred's greeting covers it) */}
+          {activeModule !== "home" && (
+            <div key={activeModule} style={{ marginBottom: isMobile ? "24px" : "40px", animation: "fadeUp 0.4s cubic-bezier(0.22,1,0.36,1) both" }}>
+              <div style={{
+                fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.16em",
+                textTransform: "uppercase", color: C.amber, marginBottom: "10px",
+                animation: "typeReveal 0.5s ease 0.1s both",
+              }}>{meta.mono}</div>
+              {!isMobile && (
+                <h1 style={{
+                  fontFamily: F.display, fontSize: "48px", fontWeight: 300,
+                  color: C.cream, lineHeight: 1.05, marginBottom: "8px", letterSpacing: "-0.02em",
+                  textShadow: "0 0 20px rgba(123,143,163,0.06)",
+                  animation: "typeReveal 0.5s ease 0.15s both",
+                }}>{meta.title}</h1>
+              )}
+              <p style={{
+                fontFamily: F.body, fontSize: isMobile ? "14px" : "15px", fontWeight: 300,
+                color: C.iron, fontStyle: "italic",
+                animation: "typeReveal 0.5s ease 0.2s both",
+              }}>{meta.subtitle}</p>
+            </div>
+          )}
 
-          {/* Divider — animated gradient line */}
-          <div style={{
-            height: "1px", marginBottom: isMobile ? "24px" : "32px",
-            background: `linear-gradient(90deg, ${C.amber}, ${C.amber}50, transparent 70%)`,
-            backgroundSize: "200% 100%",
-            animation: "borderFlow 8s ease infinite",
-          }} />
+          {/* Divider — hidden on Home */}
+          {activeModule !== "home" && (
+            <div style={{
+              height: "1px", marginBottom: isMobile ? "24px" : "32px",
+              background: `linear-gradient(90deg, ${C.amber}, ${C.amber}50, transparent 70%)`,
+              backgroundSize: "200% 100%",
+              animation: "borderFlow 8s ease infinite",
+            }} />
+          )}
 
           <div key={activeModule + "-content"}>
             {activeModule === "home" && <HomepageModule isMobile={isMobile} session={auth.session} refreshKey={refreshKey} triggerRefresh={triggerRefresh} />}
