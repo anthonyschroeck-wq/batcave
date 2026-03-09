@@ -1100,11 +1100,10 @@ function QuickCommand({ isMobile, session, triggerRefresh }) {
 
 function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
   const [markets, setMarkets] = useState(null);
-  const [news, setNews] = useState(null);
   const [brief, setBrief] = useState(null);
   const [briefLoading, setBriefLoading] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [time, setTime] = useState(new Date());
 
   const headers = session?.access_token
     ? { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }
@@ -1123,29 +1122,174 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
     setBriefLoading(false);
   }, [session]);
 
-  const fetchData = useCallback(async () => {
+  const fetchMarkets = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
-      const [mkts, nws] = await Promise.all([
-        fetch("/api/markets").then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch("/api/news?category=general").then(r => r.ok ? r.json() : null).catch(() => null),
-      ]);
+      const mkts = await fetch("/api/markets").then(r => r.ok ? r.json() : null).catch(() => null);
       setMarkets(mkts);
-      setNews(nws);
-      if (!mkts && !nws) setError("Connect Finnhub in Integrations to enable live data.");
-    } catch {
-      setError("Failed to fetch data.");
-    }
+    } catch {}
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchData(); fetchBrief(false); }, [fetchData, fetchBrief]);
+  useEffect(() => { fetchMarkets(); fetchBrief(false); }, [fetchMarkets, fetchBrief]);
+  useEffect(() => { const t = setInterval(() => setTime(new Date()), 30000); return () => clearInterval(t); }, []);
+
+  const clocks = [
+    { label: "Nashville", tz: "America/Chicago", abbr: "CT" },
+    { label: "New York", tz: "America/New_York", abbr: "ET" },
+    { label: "Seattle", tz: "America/Los_Angeles", abbr: "PT" },
+    { label: "London", tz: "Europe/London", abbr: "GMT" },
+  ];
+  const getTimeIn = (tz) => { try { return time.toLocaleTimeString("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit", hour12: true }); } catch { return "--"; } };
+
+  return (
+    <div style={{ animation: "fadeUp 0.4s ease both" }}>
+      {/* Quick Command — front and center */}
+      <div style={{ marginBottom: "24px" }}>
+        <QuickCommand isMobile={isMobile} session={session} triggerRefresh={triggerRefresh} />
+      </div>
+
+      {/* Clocks + Compact Tickers */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "14px", marginBottom: "24px" }}>
+        {/* World Clocks */}
+        <div style={{
+          background: "rgba(22,22,32,0.4)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+          border: "1px solid rgba(70,70,90,0.25)", borderRadius: "10px",
+          padding: isMobile ? "16px" : "18px 20px",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+        }}>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${isMobile ? 2 : clocks.length}, 1fr)`, gap: isMobile ? "16px" : "8px" }}>
+            {clocks.map((c, i) => (
+              <div key={c.tz} style={{ textAlign: "center", animation: `typeReveal 0.3s ease ${0.06 * i}s both` }}>
+                <div style={{ fontFamily: F.display, fontSize: isMobile ? "24px" : "22px", color: i === 0 ? C.cream : C.fog, fontWeight: 300, lineHeight: 1.2 }}>{getTimeIn(c.tz)}</div>
+                <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, letterSpacing: "0.06em", marginTop: "4px" }}>{c.label}</div>
+                <div style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate }}>{c.abbr}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Compact Tickers */}
+        <div style={{
+          background: "rgba(22,22,32,0.4)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+          border: "1px solid rgba(70,70,90,0.25)", borderRadius: "10px",
+          padding: isMobile ? "16px" : "18px 20px",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+        }}>
+          {markets?.indices ? (
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${markets.indices.length}, 1fr)`, gap: "8px" }}>
+              {markets.indices.map((idx, i) => {
+                const up = idx.change >= 0;
+                return (
+                  <div key={idx.id} style={{ textAlign: "center", animation: `typeReveal 0.3s ease ${0.06 * i}s both` }}>
+                    <div style={{ fontFamily: F.display, fontSize: isMobile ? "20px" : "18px", color: C.cream, fontWeight: 300, lineHeight: 1.2 }}>
+                      {idx.price?.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </div>
+                    <div style={{ fontFamily: F.mono, fontSize: "9px", marginTop: "4px", color: up ? C.success : C.danger }}>
+                      {up ? "+" : ""}{idx.changePct?.toFixed(2)}%
+                    </div>
+                    <div style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate }}>{idx.symbol}</div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontFamily: F.mono, fontSize: "10px", color: C.iron }}>
+              {loading ? "Loading..." : "Connect Finnhub"}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* AI Briefing */}
+      <div style={{ marginBottom: "28px" }}>
+        {brief?.content ? (
+          <div style={{
+            position: "relative", overflow: "hidden", borderRadius: "10px",
+            background: "linear-gradient(135deg, rgba(26,26,36,0.8) 0%, rgba(14,14,22,0.9) 60%, rgba(10,10,16,0.95) 100%)",
+            border: "1px solid rgba(70,70,90,0.25)",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03), 0 4px 32px rgba(0,0,0,0.2)",
+          }}>
+            <div style={{ position: "absolute", top: "-40px", right: "-40px", width: "200px", height: "200px", borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(123,143,163,0.25) 0%, transparent 75%)", animation: "orbFloat 15s ease-in-out infinite", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "3px",
+              background: `linear-gradient(180deg, ${C.amber}, ${C.amberLight}80, transparent)`, backgroundSize: "100% 200%", animation: "borderFlow 6s ease infinite" }} />
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: isMobile ? "18px 20px 0" : "22px 28px 0" }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
+                <span style={{ fontFamily: F.display, fontSize: "15px", color: C.amber, fontStyle: "italic", fontWeight: 300 }}>Briefing</span>
+                <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate }}>{brief.brief_date}</span>
+              </div>
+              <button onClick={() => fetchBrief(true)} disabled={briefLoading} style={{
+                background: "none", border: "none", cursor: "pointer", fontFamily: F.mono, fontSize: "9px", color: C.iron, opacity: briefLoading ? 0.4 : 0.7,
+              }}>{briefLoading ? "generating..." : "regenerate"}</button>
+            </div>
+
+            <div style={{ padding: isMobile ? "14px 20px 18px" : "18px 28px 24px", position: "relative", zIndex: 1 }}>
+              {brief.content.split("\n").filter(l => l.trim()).map((line, i) => {
+                const t = line.trim();
+                if (i === 0) return <div key={i} style={{ fontFamily: F.display, fontSize: isMobile ? "20px" : "26px", fontWeight: 300, color: C.cream, lineHeight: 1.3, marginBottom: "16px", animation: `typeReveal 0.4s ease ${0.1*(i+1)}s both` }}>{t}</div>;
+                if (t.startsWith("-") || t.startsWith("*")) return (
+                  <div key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start", padding: "6px 0", animation: `typeReveal 0.4s ease ${0.08*(i+1)}s both` }}>
+                    <div style={{ width: "4px", height: "4px", borderRadius: "50%", backgroundColor: C.amber, marginTop: "7px", flexShrink: 0, animation: "glowPulse 3s ease infinite" }} />
+                    <span style={{ fontFamily: F.body, fontSize: "13px", color: C.fog, lineHeight: 1.65, fontWeight: 300 }}>{t.replace(/^[-*]\s*/,"")}</span>
+                  </div>
+                );
+                if (t.endsWith(":") || (t === t.toUpperCase() && t.length < 40)) return <div key={i} style={{ fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.12em", textTransform: "uppercase", color: C.amber, marginTop: "14px", marginBottom: "4px", animation: `typeReveal 0.4s ease ${0.08*(i+1)}s both` }}>{t}</div>;
+                return <div key={i} style={{ fontFamily: F.body, fontSize: "13px", color: C.fog, lineHeight: 1.65, fontWeight: 300, padding: "2px 0", animation: `typeReveal 0.4s ease ${0.08*(i+1)}s both` }}>{t}</div>;
+              })}
+            </div>
+            {brief.tokens_used && <div style={{ padding: isMobile ? "0 20px 12px" : "0 28px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <div style={{ width: "4px", height: "4px", borderRadius: "50%", backgroundColor: C.success, animation: "breathe 3s ease infinite" }} />
+              <span style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate }}>{brief.tokens_used} tokens</span>
+            </div>}
+          </div>
+        ) : (
+          <div style={{
+            borderRadius: "10px", background: `linear-gradient(135deg, ${C.cavern} 0%, ${C.abyss} 100%)`,
+            border: "1px solid rgba(70,70,90,0.25)", padding: isMobile ? "32px 24px" : "40px", textAlign: "center", position: "relative",
+          }}>
+            <div style={{ fontFamily: F.display, fontSize: isMobile ? "18px" : "22px", color: C.cream, marginBottom: "10px", fontWeight: 300 }}>Your morning brief</div>
+            <div style={{ fontFamily: F.body, fontSize: "13px", color: C.iron, lineHeight: 1.6, marginBottom: "16px" }}>
+              {briefLoading ? "Generating..." : "Connect Anthropic in Integrations, then generate."}
+            </div>
+            {!briefLoading && <button onClick={() => fetchBrief(true)} style={{
+              background: `linear-gradient(135deg, ${C.amber}, ${C.embers})`, border: "none", borderRadius: "6px",
+              padding: "8px 20px", fontFamily: F.mono, fontSize: "11px", fontWeight: 500, color: C.obsidian, cursor: "pointer",
+            }}>generate briefing</button>}
+          </div>
+        )}
+      </div>
+
+      {/* Weather placeholder */}
+      <div style={{
+        background: "rgba(22,22,32,0.4)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+        border: "1px solid rgba(70,70,90,0.25)", borderRadius: "10px",
+        padding: isMobile ? "16px" : "18px 20px", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)", textAlign: "center",
+      }}>
+        <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, letterSpacing: "0.06em", textTransform: "uppercase" }}>Weather — coming soon</div>
+        <div style={{ fontFamily: F.sans, fontSize: "12px", color: C.slate, marginTop: "6px" }}>OpenWeather integration in next update</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── News Module ─────────────────────────────────────────────────
+function NewsModule({ isMobile }) {
+  const [news, setNews] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchNews = useCallback(async () => {
+    setLoading(true);
+    try { const res = await fetch("/api/news?category=general"); if (res.ok) setNews(await res.json()); } catch {}
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchNews(); }, [fetchNews]);
 
   const formatTime = (unix) => {
     if (!unix) return "";
-    const d = new Date(unix * 1000);
-    const now = new Date();
+    const d = new Date(unix * 1000); const now = new Date();
     const diffH = Math.floor((now - d) / 3600000);
     if (diffH < 1) return `${Math.floor((now - d) / 60000)}m ago`;
     if (diffH < 24) return `${diffH}h ago`;
@@ -1154,337 +1298,98 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
 
   return (
     <div style={{ animation: "fadeUp 0.4s ease both" }}>
-
-      {/* AI Briefing — hero composition */}
-      <div style={{ marginBottom: "36px" }}>
-        {brief?.content ? (
-          <div style={{
-            position: "relative", overflow: "hidden",
-            borderRadius: "8px",
-            background: `linear-gradient(135deg, rgba(26,26,36,0.8) 0%, rgba(14,14,22,0.9) 60%, rgba(10,10,16,0.95) 100%)`,
-            border: `1px solid ${C.stone}`,
-            animation: "fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) both",
-          }}>
-            {/* Ambient glow behind card */}
-            <div style={{
-              position: "absolute", top: "-40px", right: "-40px",
-              width: "200px", height: "200px", borderRadius: "50%",
-              background: "radial-gradient(circle, rgba(123,143,163,0.25) 0%, rgba(123,143,163,0.06) 50%, transparent 75%)",
-              animation: "ambientShift 15s ease-in-out infinite",
-              pointerEvents: "none",
-            }} />
-
-            {/* Left accent bar */}
-            <div style={{
-              position: "absolute", left: 0, top: 0, bottom: 0, width: "3px",
-              background: `linear-gradient(180deg, ${C.amber}, ${C.amberLight}80, ${C.embers}20, transparent)`,
-              backgroundSize: "100% 200%",
-              animation: "borderFlow 6s ease infinite",
-            }} />
-
-            {/* Header row */}
-            <div style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: isMobile ? "18px 20px 0 20px" : "24px 28px 0 28px",
-            }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
-                <span style={{
-                  fontFamily: F.display, fontSize: isMobile ? "14px" : "15px",
-                  color: C.amber, fontStyle: "italic", fontWeight: 300,
-                }}>Briefing</span>
-                <span style={{
-                  fontFamily: F.mono, fontSize: "9px", color: C.slate,
-                  letterSpacing: "0.06em",
-                }}>{brief.brief_date}</span>
-              </div>
-              <button onClick={() => fetchBrief(true)} disabled={briefLoading} style={{
-                background: "none", border: "none", cursor: "pointer",
-                fontFamily: F.mono, fontSize: "9px", color: C.iron,
-                letterSpacing: "0.04em", opacity: briefLoading ? 0.4 : 0.7,
-                transition: "opacity 0.2s",
-              }}
-                onMouseEnter={e => e.currentTarget.style.opacity = "1"}
-                onMouseLeave={e => e.currentTarget.style.opacity = "0.7"}
-              >{briefLoading ? "generating..." : "regenerate"}</button>
-            </div>
-
-            {/* Content — typographic composition */}
-            <div style={{
-              padding: isMobile ? "16px 20px 20px" : "20px 28px 28px",
-              position: "relative", zIndex: 1,
-            }}>
-              {brief.content.split("\n").filter(l => l.trim()).map((line, i) => {
-                const trimmed = line.trim();
-                // First line = status headline
-                if (i === 0) return (
-                  <div key={i} style={{
-                    fontFamily: F.display, fontSize: isMobile ? "22px" : "28px",
-                    fontWeight: 300, color: C.cream, lineHeight: 1.3,
-                    marginBottom: "20px", maxWidth: "560px",
-                    animation: `typeReveal 0.4s ease ${0.1 * (i + 1)}s both`,
-                  }}>{trimmed}</div>
-                );
-                // Bullet points
-                if (trimmed.startsWith("-") || trimmed.startsWith("*")) {
-                  const text = trimmed.replace(/^[-*]\s*/, "");
-                  return (
-                    <div key={i} style={{
-                      display: "flex", gap: "12px", alignItems: "flex-start",
-                      padding: "8px 0",
-                      animation: `typeReveal 0.4s ease ${0.08 * (i + 1)}s both`,
-                    }}>
-                      <div style={{
-                        width: "4px", height: "4px", borderRadius: "50%",
-                        backgroundColor: C.amber, marginTop: "8px", flexShrink: 0,
-                        animation: "glowPulse 3s ease infinite",
-                        animationDelay: `${i * 0.5}s`,
-                      }} />
-                      <span style={{
-                        fontFamily: F.body, fontSize: isMobile ? "13px" : "14px",
-                        color: C.fog, lineHeight: 1.7, fontWeight: 300,
-                      }}>{text}</span>
-                    </div>
-                  );
-                }
-                // Section headers (bold-looking lines)
-                if (trimmed.endsWith(":") || trimmed.toUpperCase() === trimmed && trimmed.length < 40) return (
-                  <div key={i} style={{
-                    fontFamily: F.mono, fontSize: "9px", letterSpacing: "0.12em",
-                    textTransform: "uppercase", color: C.amber, marginTop: "18px", marginBottom: "6px",
-                    animation: `typeReveal 0.4s ease ${0.08 * (i + 1)}s both`,
-                  }}>{trimmed}</div>
-                );
-                // Regular lines
-                return (
-                  <div key={i} style={{
-                    fontFamily: F.body, fontSize: isMobile ? "13px" : "14px",
-                    color: C.fog, lineHeight: 1.7, fontWeight: 300,
-                    padding: "3px 0",
-                    animation: `typeReveal 0.4s ease ${0.08 * (i + 1)}s both`,
-                  }}>{trimmed}</div>
-                );
-              })}
-            </div>
-
-            {/* Footer */}
-            {brief.tokens_used && (
-              <div style={{
-                padding: isMobile ? "0 20px 14px" : "0 28px 18px",
-                display: "flex", alignItems: "center", gap: "8px",
-              }}>
-                <div style={{
-                  width: "4px", height: "4px", borderRadius: "50%",
-                  backgroundColor: C.success, animation: "breathe 3s ease infinite",
-                }} />
-                <span style={{
-                  fontFamily: F.mono, fontSize: "8px", color: C.slate,
-                  letterSpacing: "0.06em",
-                }}>{brief.tokens_used} tokens</span>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div style={{
-            borderRadius: "8px", overflow: "hidden",
-            background: `linear-gradient(135deg, ${C.cavern} 0%, ${C.abyss} 100%)`,
-            border: `1px solid ${C.stone}`,
-            padding: isMobile ? "32px 24px" : "48px 40px",
-            textAlign: "center", position: "relative",
-          }}>
-            <div style={{
-              position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-              width: "300px", height: "300px", borderRadius: "50%",
-              background: `radial-gradient(circle, ${C.dusk} 0%, transparent 70%)`,
-              animation: "ambientShift 12s ease-in-out infinite",
-              pointerEvents: "none",
-            }} />
-            <div style={{
-              fontFamily: F.display, fontSize: isMobile ? "18px" : "22px",
-              color: C.cream, marginBottom: "10px", position: "relative",
-              fontWeight: 300,
-            }}>Your morning brief</div>
-            <div style={{
-              fontFamily: F.body, fontSize: "13px", color: C.iron,
-              lineHeight: 1.6, position: "relative", marginBottom: "20px",
-            }}>
-              {briefLoading ? "Assembling context and generating..." : "Connect Anthropic in Integrations, then generate."}
-            </div>
-            {!briefLoading && (
-              <button onClick={() => fetchBrief(true)} style={{
-                background: `linear-gradient(135deg, ${C.amber}, ${C.embers})`,
-                border: "none", borderRadius: "4px",
-                padding: isMobile ? "12px 24px" : "8px 20px",
-                fontFamily: F.mono, fontSize: "11px", fontWeight: 500,
-                color: C.obsidian, cursor: "pointer", position: "relative",
-                letterSpacing: "0.04em",
-              }}>generate briefing</button>
-            )}
-          </div>
-        )}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+        <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, letterSpacing: "0.06em" }}>{news?.articles?.length || 0} headlines</div>
+        <button onClick={fetchNews} style={{ background: "none", border: `1px solid ${C.slate}`, borderRadius: "4px", padding: isMobile ? "6px 12px" : "3px 10px", fontFamily: F.mono, fontSize: "10px", color: C.amber, cursor: "pointer" }}>{loading ? "..." : "refresh"}</button>
       </div>
-
-      {/* Quick Command */}
-      <QuickCommand isMobile={isMobile} session={session} triggerRefresh={triggerRefresh} />
-
-      {/* Market Indices */}
-      <div style={{ marginBottom: "32px" }}>
-        <div style={{
-          fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.08em",
-          textTransform: "uppercase", color: C.amber, marginBottom: "16px",
-        }}>Markets</div>
-
-        {loading && !markets && (
-          <div style={{ fontFamily: F.mono, fontSize: "12px", color: C.iron }}>Loading market data...</div>
-        )}
-
-        {error && !markets && (
-          <div style={{
-            padding: isMobile ? "16px" : "20px", borderRadius: "6px",
-            backgroundColor: C.cavern, border: `1px solid ${C.stone}`,
-            fontFamily: F.sans, fontSize: "13px", color: C.fog, lineHeight: 1.6,
-          }}>{error}</div>
-        )}
-
-        {markets?.indices && (
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
-            gap: "12px",
-          }}>
-            {markets.indices.map((idx, i) => {
-              const up = idx.change >= 0;
-              return (
-                <div key={idx.id} style={{
-                  backgroundColor: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
-                  padding: isMobile ? "16px" : "20px",
-                  animation: `fadeUp 0.35s ease ${0.06 * i}s both`,
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
-                    <div>
-                      <div style={{ fontFamily: F.sans, fontSize: "12px", fontWeight: 600, color: C.fog }}>{idx.label}</div>
-                      <div style={{ fontFamily: F.mono, fontSize: "10px", color: C.iron }}>{idx.symbol}</div>
-                    </div>
-                    <div style={{
-                      fontFamily: F.mono, fontSize: "10px", padding: "2px 8px", borderRadius: "3px",
-                      backgroundColor: up ? "rgba(90,138,106,0.12)" : "rgba(154,74,74,0.12)",
-                      color: up ? C.success : C.danger,
-                    }}>
-                      {up ? "+" : ""}{idx.changePct?.toFixed(2)}%
-                    </div>
-                  </div>
-                  <div style={{
-                    fontFamily: F.display, fontSize: isMobile ? "28px" : "32px",
-                    color: C.cream, lineHeight: 1, marginBottom: "6px",
-                  }}>
-                    {idx.price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                  <div style={{ fontFamily: F.mono, fontSize: "10px", color: up ? C.success : C.danger }}>
-                    {up ? "+" : ""}{idx.change?.toFixed(2)}
-                  </div>
-                  <div style={{
-                    display: "flex", gap: "12px", marginTop: "8px",
-                    fontFamily: F.mono, fontSize: "9px", color: C.iron,
-                  }}>
-                    <span>H {idx.high?.toFixed(2)}</span>
-                    <span>L {idx.low?.toFixed(2)}</span>
-                    <span>O {idx.open?.toFixed(2)}</span>
-                  </div>
+      {loading && !news && <div style={{ fontFamily: F.mono, fontSize: "12px", color: C.iron }}>Loading headlines...</div>}
+      {news?.articles && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+          {news.articles.map((article, i) => (
+            <a key={article.id || i} href={article.url} target="_blank" rel="noopener noreferrer" style={{
+              display: "flex", gap: "14px", padding: isMobile ? "14px 0" : "12px 0", borderBottom: `1px solid ${C.stone}`,
+              textDecoration: "none", color: "inherit", animation: `fadeUp 0.3s ease ${0.03*i}s both`, transition: "background-color 0.15s ease",
+            }} onMouseEnter={e => e.currentTarget.style.backgroundColor = C.amberSubtle} onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}>
+              {article.image && !isMobile && <div style={{ width: "80px", height: "54px", borderRadius: "6px", overflow: "hidden", flexShrink: 0, backgroundColor: C.stone }}>
+                <img src={article.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => e.currentTarget.style.display="none"} />
+              </div>}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: F.sans, fontSize: isMobile ? "14px" : "13px", fontWeight: 500, color: C.parchment, lineHeight: 1.4, marginBottom: "4px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{article.headline}</div>
+                {article.summary && !isMobile && <div style={{ fontFamily: F.sans, fontSize: "12px", color: C.iron, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{article.summary}</div>}
+                <div style={{ display: "flex", gap: "10px", marginTop: "4px", fontFamily: F.mono, fontSize: "10px", color: C.iron }}>
+                  <span style={{ color: C.amber }}>{article.source}</span><span>{formatTime(article.datetime)}</span>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* News */}
-      <div>
-        <div style={{
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-          marginBottom: "16px",
-        }}>
-          <div style={{
-            fontFamily: F.mono, fontSize: "10px", letterSpacing: "0.08em",
-            textTransform: "uppercase", color: C.amber,
-          }}>Top News</div>
-          <button onClick={fetchData} style={{
-            background: "none", border: `1px solid ${C.slate}`, borderRadius: "3px",
-            padding: isMobile ? "6px 12px" : "2px 8px",
-            fontFamily: F.mono, fontSize: "10px", color: C.amber,
-            cursor: "pointer", minHeight: isMobile ? "32px" : undefined,
-          }}>
-            {loading ? "..." : "refresh"}
-          </button>
+              </div>
+            </a>
+          ))}
         </div>
+      )}
+      {!loading && !news && <div style={{ padding: "32px 20px", borderRadius: "8px", background: "rgba(22,22,32,0.4)", border: "1px solid rgba(70,70,90,0.25)", textAlign: "center" }}>
+        <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.iron }}>Connect Finnhub in Integrations to surface news.</div>
+      </div>}
+    </div>
+  );
+}
 
-        {loading && !news && (
-          <div style={{ fontFamily: F.mono, fontSize: "12px", color: C.iron }}>Loading headlines...</div>
-        )}
+// ─── Finance Module ──────────────────────────────────────────────
+function FinanceModule({ isMobile }) {
+  const [markets, setMarkets] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-        {news?.articles && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
-            {news.articles.map((article, i) => (
-              <a key={article.id || i} href={article.url} target="_blank" rel="noopener noreferrer"
-                style={{
-                  display: "flex", gap: "14px", padding: isMobile ? "14px 0" : "12px 0",
-                  borderBottom: `1px solid ${C.stone}`,
-                  textDecoration: "none", color: "inherit",
-                  minHeight: isMobile ? "60px" : undefined,
-                  animation: `fadeUp 0.3s ease ${0.03 * i}s both`,
-                  transition: "background-color 0.15s ease",
-                }}
-                onMouseEnter={e => e.currentTarget.style.backgroundColor = C.amberSubtle}
-                onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
-              >
-                {/* Thumbnail */}
-                {article.image && !isMobile && (
-                  <div style={{
-                    width: "80px", height: "54px", borderRadius: "4px", overflow: "hidden",
-                    flexShrink: 0, backgroundColor: C.stone,
-                  }}>
-                    <img src={article.image} alt="" style={{
-                      width: "100%", height: "100%", objectFit: "cover",
-                    }} onError={e => e.currentTarget.style.display = "none"} />
+  const fetchMarkets = useCallback(async () => {
+    setLoading(true);
+    try { const res = await fetch("/api/markets"); if (res.ok) setMarkets(await res.json()); } catch {}
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchMarkets(); }, [fetchMarkets]);
+
+  return (
+    <div style={{ animation: "fadeUp 0.4s ease both" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+        <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, letterSpacing: "0.06em" }}>{markets?.timestamp ? `Updated ${new Date(markets.timestamp).toLocaleTimeString()}` : ""}</div>
+        <button onClick={fetchMarkets} style={{ background: "none", border: `1px solid ${C.slate}`, borderRadius: "4px", padding: isMobile ? "6px 12px" : "3px 10px", fontFamily: F.mono, fontSize: "10px", color: C.amber, cursor: "pointer" }}>{loading ? "..." : "refresh"}</button>
+      </div>
+      {loading && !markets && <div style={{ fontFamily: F.mono, fontSize: "12px", color: C.iron }}>Loading market data...</div>}
+      {markets?.indices && (
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: "16px" }}>
+          {markets.indices.map((idx, i) => {
+            const up = idx.change >= 0;
+            return (
+              <div key={idx.id} style={{
+                background: "rgba(22,22,32,0.5)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+                border: "1px solid rgba(70,70,90,0.25)", borderRadius: "10px", padding: isMobile ? "20px" : "24px",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03), 0 4px 24px rgba(0,0,0,0.15)",
+                animation: `fadeUp 0.35s ease ${0.06*i}s both`, position: "relative", overflow: "hidden",
+              }}>
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px",
+                  background: up ? "linear-gradient(90deg, transparent, rgba(90,138,106,0.5), transparent)" : "linear-gradient(90deg, transparent, rgba(154,74,74,0.5), transparent)" }} />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+                  <div>
+                    <div style={{ fontFamily: F.sans, fontSize: "13px", fontWeight: 600, color: C.fog }}>{idx.label}</div>
+                    <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate }}>{idx.symbol}</div>
                   </div>
-                )}
-
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontFamily: F.sans, fontSize: isMobile ? "14px" : "13px", fontWeight: 500,
-                    color: C.parchment, lineHeight: 1.4, marginBottom: "4px",
-                    display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
-                  }}>{article.headline}</div>
-                  {article.summary && !isMobile && (
-                    <div style={{
-                      fontFamily: F.sans, fontSize: "12px", color: C.iron, lineHeight: 1.4,
-                      display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden",
-                    }}>{article.summary}</div>
-                  )}
-                  <div style={{
-                    display: "flex", gap: "10px", marginTop: "4px",
-                    fontFamily: F.mono, fontSize: "10px", color: C.iron,
-                  }}>
-                    <span style={{ color: C.amber }}>{article.source}</span>
-                    <span>{formatTime(article.datetime)}</span>
+                  <div style={{ fontFamily: F.mono, fontSize: "10px", padding: "3px 8px", borderRadius: "4px",
+                    backgroundColor: up ? "rgba(90,138,106,0.12)" : "rgba(154,74,74,0.12)",
+                    color: up ? C.success : C.danger, border: `1px solid ${up ? "rgba(90,138,106,0.2)" : "rgba(154,74,74,0.2)"}` }}>
+                    {up ? "+" : ""}{idx.changePct?.toFixed(2)}%
                   </div>
                 </div>
-              </a>
-            ))}
-          </div>
-        )}
-
-        {!loading && !news && !error && (
-          <div style={{
-            padding: isMobile ? "24px 16px" : "32px 20px", borderRadius: "6px",
-            backgroundColor: C.cavern, border: `1px solid ${C.stone}`,
-            textAlign: "center",
-          }}>
-            <div style={{ fontFamily: F.display, fontSize: "22px", color: C.cream, marginBottom: "8px" }}>No data yet</div>
-            <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.iron, lineHeight: 1.6 }}>
-              Add your Finnhub API key in Integrations to surface live markets and news.
-            </div>
-          </div>
-        )}
-      </div>
+                <div style={{ fontFamily: F.display, fontSize: isMobile ? "32px" : "36px", color: C.cream, lineHeight: 1, marginBottom: "8px", fontWeight: 300 }}>
+                  {idx.price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div style={{ fontFamily: F.mono, fontSize: "11px", color: up ? C.success : C.danger, marginBottom: "12px" }}>{up ? "+" : ""}{idx.change?.toFixed(2)} today</div>
+                <div style={{ display: "flex", gap: "16px", fontFamily: F.mono, fontSize: "9px", color: C.iron, borderTop: `1px solid ${C.stone}`, paddingTop: "10px" }}>
+                  <span>High {idx.high?.toFixed(2)}</span><span>Low {idx.low?.toFixed(2)}</span><span>Open {idx.open?.toFixed(2)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {!loading && !markets && <div style={{ padding: "32px 20px", borderRadius: "8px", background: "rgba(22,22,32,0.4)", border: "1px solid rgba(70,70,90,0.25)", textAlign: "center" }}>
+        <div style={{ fontFamily: F.sans, fontSize: "13px", color: C.iron }}>Connect Finnhub in Integrations for live markets.</div>
+      </div>}
     </div>
   );
 }
@@ -2692,10 +2597,11 @@ export default function BatcaveConsole() {
     { id: "home", label: "Home", icon: I.home },
     { id: "command", label: "Command", icon: I.command },
     { id: "tasks", label: "Tasks", icon: I.tasks },
+    { id: "calendar", label: "Calendar", icon: I.layers },
+    { id: "news", label: "News", icon: I.signal },
+    { id: "finance", label: "Finance", icon: I.pulse },
     { id: "projects", label: "Projects", icon: I.workspace },
     { id: "agents", label: "Agents", icon: I.agent },
-    { id: "fitness", label: "Fitness", icon: I.pulse },
-    { id: "calendar", label: "Calendar", icon: I.layers },
     { id: "integrations", label: "Integrations", icon: I.settings },
   ];
 
@@ -2703,10 +2609,11 @@ export default function BatcaveConsole() {
     home: { title: "Briefing", mono: "Command Center", subtitle: new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) },
     command: { title: "Command", mono: "Prompt", subtitle: "Natural language control" },
     tasks: { title: "Tasks", mono: "Personal Ops", subtitle: "Priority-driven task management" },
+    calendar: { title: "Calendar", mono: "Schedule", subtitle: "Personal, professional, and travel — one view" },
+    news: { title: "News", mono: "Headlines", subtitle: "Market news and global events" },
+    finance: { title: "Finance", mono: "Markets", subtitle: "Indices, quotes, and market data" },
     projects: { title: "Projects", mono: "System Registry", subtitle: `${manifest.projects.length} registered across the system` },
     agents: { title: "Agents", mono: "Autonomous Systems", subtitle: "Build and manage autonomous workflows" },
-    fitness: { title: "Fitness", mono: "Performance", subtitle: "Workouts, nutrition, recovery tracking" },
-    calendar: { title: "Calendar", mono: "Schedule", subtitle: "Personal, professional, and travel — one view" },
     integrations: { title: "Integrations", mono: "Admin", subtitle: "Manage service connections" },
   };
 
@@ -2718,15 +2625,6 @@ export default function BatcaveConsole() {
         { label: "Monitor", title: "Repo Watcher", desc: "Track downstream changes" },
         { label: "Pipeline", title: "CI Orchestrator", desc: "Cross-package builds" },
         { label: "Research", title: "Scout", desc: "Surface signals from feeds" },
-      ],
-    },
-    fitness: {
-      description: "Track workouts, nutrition, and recovery with weekly summaries and trend analysis. The body is infrastructure too.",
-      items: [
-        { label: "Log", title: "Workout Log", desc: "Exercises, sets, duration" },
-        { label: "Nutrition", title: "Fuel Tracker", desc: "Meals, macros, hydration" },
-        { label: "Recovery", title: "Recovery Score", desc: "Sleep, soreness, readiness" },
-        { label: "Trends", title: "Progress", desc: "Weekly and monthly trends" },
       ],
     },
   };
@@ -2776,7 +2674,7 @@ export default function BatcaveConsole() {
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.6 // batcave</span>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v3.7 // batcave</span>
           {auth.session && (
             <button onClick={auth.signOut} style={{
               background: "none", border: "none", cursor: "pointer",
@@ -3088,9 +2986,11 @@ export default function BatcaveConsole() {
             {activeModule === "command" && <ChatShell isMobile={isMobile} session={auth.session} liveData={liveData} triggerRefresh={triggerRefresh} />}
             {activeModule === "tasks" && <TasksModule isMobile={isMobile} session={auth.session} refreshKey={refreshKey} />}
             {activeModule === "calendar" && <CalendarModule isMobile={isMobile} session={auth.session} refreshKey={refreshKey} />}
+            {activeModule === "news" && <NewsModule isMobile={isMobile} />}
+            {activeModule === "finance" && <FinanceModule isMobile={isMobile} />}
             {activeModule === "projects" && <ProjectsModule isMobile={isMobile} liveData={liveData} />}
             {activeModule === "integrations" && <IntegrationsModule isMobile={isMobile} liveData={liveData} session={auth.session} />}
-            {!["home","command","tasks","calendar","projects","integrations"].includes(activeModule) && placeholders[activeModule] && (
+            {!["home","command","tasks","calendar","news","finance","projects","integrations"].includes(activeModule) && placeholders[activeModule] && (
               <PlaceholderModule description={placeholders[activeModule].description} items={placeholders[activeModule].items} isMobile={isMobile} />
             )}
           </div>
