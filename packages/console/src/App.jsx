@@ -1216,16 +1216,16 @@ function TickerBar({ isMobile }) {
         zIndex: isMobile ? 49 : 40, flexShrink: 0,
         overflow: "hidden",
       }}>
-        {/* Scrolling content */}
+        {/* Scrolling content — duplicated for seamless loop */}
         <div style={{
           display: "flex", alignItems: "center", gap: "0",
-          animation: items.length > 4 && !isMobile ? `tickerScroll ${items.length * 4}s linear infinite` : "none",
+          animation: items.length > (isMobile ? 2 : 4) ? `tickerScroll ${items.length * 5}s linear infinite` : "none",
           whiteSpace: "nowrap", paddingLeft: isMobile ? "8px" : "12px",
         }}>
-          {items.map((item, i) => (
+          {[...items, ...(items.length > (isMobile ? 2 : 4) ? items : [])].map((item, i) => (
             <div key={`${item.type}-${item.label}-${i}`} style={{
               display: "inline-flex", alignItems: "center", gap: "5px",
-              padding: "0 12px",
+              padding: isMobile ? "0 10px" : "0 12px",
               borderRight: "1px solid rgba(50,50,65,0.2)",
             }}>
               {item.type === "clock" && (
