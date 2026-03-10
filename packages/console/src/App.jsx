@@ -1311,6 +1311,7 @@ function TickerBar({ isMobile }) {
 function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
   const [brief, setBrief] = useState(null);
   const [briefLoading, setBriefLoading] = useState(false);
+  const [briefError, setBriefError] = useState(null);
 
   const headers = session?.access_token
     ? { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }
@@ -1318,14 +1319,24 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
 
   const fetchBrief = useCallback(async (forceNew) => {
     setBriefLoading(true);
+    setBriefError(null);
     try {
       if (!forceNew) {
         const cached = await fetch("/api/brief").then(r => r.ok ? r.json() : null).catch(() => null);
         if (cached?.brief) { setBrief(cached.brief); setBriefLoading(false); return; }
       }
-      const gen = await fetch("/api/brief", { method: "POST", headers }).then(r => r.ok ? r.json() : null).catch(() => null);
-      if (gen?.brief) setBrief(gen.brief);
-    } catch {}
+      const res = await fetch("/api/brief", { method: "POST", headers });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        setBriefError(`${res.status}: ${errData.error || errData.detail || res.statusText}`);
+      } else {
+        const gen = await res.json();
+        if (gen?.brief) setBrief(gen.brief);
+        else setBriefError("Brief generated but returned empty");
+      }
+    } catch (e) {
+      setBriefError(`Network error: ${e.message}`);
+    }
     setBriefLoading(false);
   }, [session]);
 
@@ -1661,6 +1672,13 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
             padding: "10px 24px", fontFamily: F.mono, fontSize: "11px", fontWeight: 500,
             color: C.obsidian, cursor: "pointer", letterSpacing: "0.04em",
           }}>generate briefing</button>
+          {briefError && (
+            <div style={{
+              fontFamily: F.mono, fontSize: "10px", color: C.danger,
+              marginTop: "12px", padding: "8px 12px",
+              background: "rgba(154,74,74,0.08)", borderRadius: "4px",
+            }}>{briefError}</div>
+          )}
         </div>
       ) : (
         /* Loading state */

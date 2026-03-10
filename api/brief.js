@@ -16,8 +16,8 @@ function safeParseBrief(content) {
   try { const p = JSON.parse(raw); if (p && p.items) return p; } catch {}
   return null;
 }
-const SONNET_INPUT_COST = 3.0;
-const SONNET_OUTPUT_COST = 15.0;
+const BRIEF_INPUT_COST = 1.0;  // Haiku 4.5
+const BRIEF_OUTPUT_COST = 5.0;
 
 export default async function handler(req, res) {
   if (req.method !== "POST" && req.method !== "GET") return res.status(405).json({ error: "GET or POST" });
@@ -89,11 +89,11 @@ export default async function handler(req, res) {
   const contextStr = `Date: ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
 
 TASKS (${tasks.length} open):
-${tasks.slice(0, 15).map(t => `- [${t.priority.toUpperCase()}]${t.recurrence ? ` [${t.recurrence.toUpperCase()}]` : ""} ${t.title} (id: ${t.id}, due: ${t.due_date || "no date"})`).join("\n") || "None"}
-${overdue.length > 0 ? `OVERDUE: ${overdue.map(t => `${t.title} (id: ${t.id}, was due ${t.due_date})`).join(", ")}` : ""}
+${tasks.slice(0, 10).map(t => `- [${t.priority.toUpperCase()}]${t.recurrence ? ` [${t.recurrence.toUpperCase()}]` : ""} ${t.title} (id: ${t.id}, due: ${t.due_date || "none"})`).join("\n") || "None"}
+${overdue.length > 0 ? `OVERDUE: ${overdue.slice(0, 5).map(t => `${t.title} (id: ${t.id}, due ${t.due_date})`).join(", ")}` : ""}
 
-CALENDAR (upcoming):
-${events.slice(0, 10).map(e => `- ${e.title}: ${e.start_date}${e.end_date !== e.start_date ? " to " + e.end_date : ""} [${e.category}]${e.location ? " @ " + e.location : ""}`).join("\n") || "Nothing scheduled"}
+CALENDAR:
+${events.slice(0, 7).map(e => `- ${e.title}: ${e.start_date}${e.end_date !== e.start_date ? " to " + e.end_date : ""} [${e.category}]`).join("\n") || "Nothing scheduled"}
 
 FITNESS:
 ${fitnessGoals.length > 0 ? fitnessGoals.map(g => `- GOAL: ${g.title} (${g.target_value} ${g.target_unit} per ${g.target_period})`).join("\n") : "No fitness goals set"}
@@ -115,8 +115,8 @@ AI USAGE THIS MONTH: $${(monthCost / 100).toFixed(2)}`;
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1024,
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 800,
         temperature: 0,
         system: `You are Alfred — Tony's AI butler and chief of staff inside the Batcave command center. Generate a daily briefing as a JSON object.
 
@@ -155,7 +155,7 @@ ITEM RULES:
 - When an item corresponds to a task from the TASKS context, include the task's UUID in the "task_id" field. This enables 1-touch completion from the briefing.
 - For recurring (DAILY/WEEKLY) tasks, note the recurrence in the text naturally: "Daily cardio — not yet logged today."
 - Write like a chief of staff: "Pack for Seattle — flight Monday." not "You have a trip..."
-- 8-14 items. Most urgent first, FYI last.
+- 6-10 items. Most urgent first, FYI last.
 - FITNESS: If fitness goals exist, include a fitness item early in the list. If no activity logged today and there's a daily goal, mark it as mood "alert" with horizon "today" and category "health" with icon_hint "running shoe". If activity was logged, mark it "positive". Track streaks in the text.
 - NEWS: Always include exactly 3 news items at the end as FYI items. Focus on world news and economics/markets. Each should be a single, punchy headline in your voice. Use category "news" and icon_hint "newspaper" or "chart" as appropriate. If live headlines are provided in the context, synthesize from those. If the context says "No news feed connected", generate 3 current world/economics awareness items from your own knowledge — major ongoing stories, market trends, or geopolitical developments. Mark these with mood "neutral".
 - Today's date is ${new Date().toISOString().slice(0, 10)}. Current hour: ${new Date().getHours()}.`,
@@ -184,11 +184,11 @@ ITEM RULES:
     } catch {}
 
     // Log usage
-    const costCents = (inputTokens / 1000000 * SONNET_INPUT_COST + outputTokens / 1000000 * SONNET_OUTPUT_COST) * 100;
+    const costCents = (inputTokens / 1000000 * BRIEF_INPUT_COST + outputTokens / 1000000 * BRIEF_OUTPUT_COST) * 100;
     await supabase.from("batcave_usage").insert({
       service: "anthropic", endpoint: "brief",
       input_tokens: inputTokens, output_tokens: outputTokens,
-      model: "claude-sonnet-4-20250514",
+      model: "claude-haiku-4-5-20251001",
       cost_cents: Math.round(costCents * 10000) / 10000,
     });
 
