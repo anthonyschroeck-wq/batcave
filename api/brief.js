@@ -23,6 +23,7 @@ export default async function handler(req, res) {
           const fb = cleaned.indexOf("{");
           const lb = cleaned.lastIndexOf("}");
           if (fb !== -1 && lb > fb) cleaned = cleaned.slice(fb, lb + 1);
+          cleaned = cleaned.replace(/,\s*([}\]])/g, "$1");
           JSON.parse(cleaned); // validate
           data.content = cleaned;
         } catch {}
@@ -161,6 +162,7 @@ ITEM RULES:
       const fb = cleaned.indexOf("{");
       const lb = cleaned.lastIndexOf("}");
       if (fb !== -1 && lb > fb) cleaned = cleaned.slice(fb, lb + 1);
+      cleaned = cleaned.replace(/,\s*([}\]])/g, "$1");
       JSON.parse(cleaned); // validate it's actual JSON
       content = cleaned; // store only the clean JSON
     } catch {}

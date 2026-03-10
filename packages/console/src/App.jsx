@@ -1372,6 +1372,7 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
           let cleaned = raw.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
           const fb = cleaned.indexOf("{"); const lb = cleaned.lastIndexOf("}");
           if (fb !== -1 && lb > fb) cleaned = cleaned.slice(fb, lb + 1);
+          cleaned = cleaned.replace(/,\s*([}\]])/g, "$1");
           const parsed = JSON.parse(cleaned);
           if (parsed.items) {
             parsed.items = parsed.items.filter(it => it.task_id !== taskId);
@@ -1400,6 +1401,8 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
       if (firstBrace !== -1 && lastBrace > firstBrace) {
         raw = raw.slice(firstBrace, lastBrace + 1);
       }
+      // Fix trailing commas (common AI JSON error)
+      raw = raw.replace(/,\s*([}\]])/g, "$1");
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && parsed.items) {
         briefGreeting = parsed.greeting || null;
