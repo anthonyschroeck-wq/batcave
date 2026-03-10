@@ -1,0 +1,16 @@
+{
+  "name": "@batcave/alfred",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Voice interface for the Batcave command center",
+  "type": "module",
+  "exports": {
+    "./api/voice": "./api/voice.ts",
+    "./components/AlfredConsole": "./components/AlfredConsole.jsx",
+    "./config": "./config/providers.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
