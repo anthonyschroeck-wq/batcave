@@ -50,6 +50,10 @@ async function executeActions(actions, jwt) {
   if (!supabase) return [];
   const results = [];
 
+  // Get user ID for inserts that need it
+  let userId = null;
+  try { const { data } = await supabase.auth.getUser(); userId = data?.user?.id; } catch {}
+
   for (const action of actions) {
     try {
       if (action.type === "create_task") {
@@ -97,6 +101,7 @@ async function executeActions(actions, jwt) {
       } else if (action.type === "create_fitness_goal") {
         const { data } = await supabase.from("batcave_fitness_goals")
           .insert({
+            user_id: userId,
             title: action.title,
             category: action.category || "cardio",
             target_type: action.target_type || "frequency",
@@ -108,10 +113,12 @@ async function executeActions(actions, jwt) {
       } else if (action.type === "log_activity") {
         const { data } = await supabase.from("batcave_fitness_log")
           .insert({
+            user_id: userId,
             activity_type: action.activity_type || "run",
             title: action.title || null,
             duration_minutes: action.duration_minutes || null,
             distance_miles: action.distance_miles || null,
+            calories: action.calories || null,
             activity_date: action.activity_date || new Date().toISOString().slice(0, 10),
             source: "alfred",
           }).select().single();
@@ -155,7 +162,7 @@ CAPABILITIES — you can take actions by including a JSON block in your response
   {"type": "update_event", "id": "event-uuid", "title": "...", "start_date": "...", "end_date": "...", "category": "...", "location": "..."},
   {"type": "delete_event", "id": "event-uuid"},
   {"type": "create_fitness_goal", "title": "...", "category": "cardio|strength|flexibility|recovery", "target_type": "frequency|duration|distance", "target_value": 1, "target_unit": "sessions|minutes|miles", "target_period": "day|week|month"},
-  {"type": "log_activity", "activity_type": "run|walk|cycle|swim|strength|yoga|other", "title": "...", "duration_minutes": 30, "distance_miles": 3.1, "activity_date": "YYYY-MM-DD"}
+  {"type": "log_activity", "activity_type": "run|walk|cycle|swim|strength|yoga|other", "title": "...", "duration_minutes": 30, "distance_miles": 3.1, "calories": 250, "activity_date": "YYYY-MM-DD"}
 ]
 \`\`\`
 
@@ -165,7 +172,14 @@ RULES:
 - When asked questions, answer from context. Don't guess.
 - Use the task/event IDs from context when referencing existing items.
 - For updates, only include the fields that are changing.
-- For fitness: "set a daily cardio goal" = create_fitness_goal. "I ran 3 miles" or "log my run" = log_activity.
+- For fitness: "set a daily cardio goal" = create_fitness_goal. Any mention of completing exercise = log_activity.
+- IMPORTANT: Parse natural language into structured fitness data. Examples:
+  - "I did my run today, 2 miles at 15m/mile" → log_activity with activity_type:"run", distance_miles:2, duration_minutes:30 (2 miles * 15 min/mile), title:"Run — 2mi @ 15:00/mi"
+  - "ran 5k this morning in 28 minutes" → log_activity with activity_type:"run", distance_miles:3.1, duration_minutes:28, title:"Morning 5K"
+  - "30 minute walk" → log_activity with activity_type:"walk", duration_minutes:30
+  - "hit the gym, chest and tris, 45 min" → log_activity with activity_type:"strength", duration_minutes:45, title:"Chest and triceps"
+  - "log my cardio" (no details) → log_activity with activity_type:"run", title:"Cardio session"
+- Always calculate duration from pace+distance if given (e.g. 3 miles at 10min/mile = 30 minutes).
 - Today's date is ${new Date().toISOString().slice(0, 10)}.
 - Dates like "friday", "next tuesday" should resolve to actual YYYY-MM-DD dates.`;
 
