@@ -53,8 +53,9 @@ async function executeActions(actions, jwt) {
   for (const action of actions) {
     try {
       if (action.type === "create_task") {
+        const recurrenceGroup = action.recurrence ? crypto.randomUUID() : null;
         const { data } = await supabase.from("batcave_tasks")
-          .insert({ title: action.title, priority: action.priority || "medium", due_date: action.due_date || null })
+          .insert({ title: action.title, priority: action.priority || "medium", due_date: action.due_date || null, recurrence: action.recurrence || null, recurrence_group: recurrenceGroup })
           .select().single();
         results.push({ action: "create_task", ok: true, task: data });
       } else if (action.type === "complete_task") {
@@ -146,7 +147,7 @@ ${context || "No context available."}
 CAPABILITIES — you can take actions by including a JSON block in your response:
 \`\`\`actions
 [
-  {"type": "create_task", "title": "...", "priority": "high|medium|low", "due_date": "YYYY-MM-DD"},
+  {"type": "create_task", "title": "...", "priority": "high|medium|low", "due_date": "YYYY-MM-DD", "recurrence": "null|daily|weekly"},
   {"type": "complete_task", "id": "task-uuid"},
   {"type": "update_task", "id": "task-uuid", "title": "...", "priority": "...", "due_date": "..."},
   {"type": "delete_task", "id": "task-uuid"},

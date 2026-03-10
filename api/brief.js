@@ -59,8 +59,8 @@ export default async function handler(req, res) {
   const contextStr = `Date: ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
 
 TASKS (${tasks.length} open):
-${tasks.slice(0, 15).map(t => `- [${t.priority.toUpperCase()}] ${t.title} (due: ${t.due_date || "no date"})`).join("\n") || "None"}
-${overdue.length > 0 ? `OVERDUE: ${overdue.map(t => `${t.title} (was due ${t.due_date})`).join(", ")}` : ""}
+${tasks.slice(0, 15).map(t => `- [${t.priority.toUpperCase()}]${t.recurrence ? ` [${t.recurrence.toUpperCase()}]` : ""} ${t.title} (id: ${t.id}, due: ${t.due_date || "no date"})`).join("\n") || "None"}
+${overdue.length > 0 ? `OVERDUE: ${overdue.map(t => `${t.title} (id: ${t.id}, was due ${t.due_date})`).join(", ")}` : ""}
 
 CALENDAR (upcoming):
 ${events.slice(0, 10).map(e => `- ${e.title}: ${e.start_date}${e.end_date !== e.start_date ? " to " + e.end_date : ""} [${e.category}]${e.location ? " @ " + e.location : ""}`).join("\n") || "Nothing scheduled"}
@@ -101,9 +101,10 @@ The object structure:
     {
       "text": "Concise, direct, actionable line.",
       "horizon": "now|today|tomorrow|week|fyi",
-      "mood": "urgent|warm|neutral|positive|alert",
+      "mood": "urgent|warm|neutral|positive|alert|overdue",
       "category": "task|event|travel|project|news|finance|health|personal",
-      "icon_hint": "1-2 word icon description e.g. 'laundry basket', 'airplane', 'calendar', 'warning', 'gift', 'code', 'chart', 'newspaper'"
+      "icon_hint": "1-2 word icon description e.g. 'laundry basket', 'airplane', 'calendar', 'warning', 'gift', 'code', 'chart', 'newspaper'",
+      "task_id": "If this item corresponds to a specific task, include the task UUID from context. Otherwise omit or null."
     }
   ]
 }
@@ -117,7 +118,11 @@ GREETING RULES:
 
 ITEM RULES:
 - "now" = overdue or happening today. "today" = do today. "tomorrow" = tomorrow. "week" = this week. "fyi" = awareness only.
-- mood drives color: urgent=red, warm=amber, neutral=default, positive=green, alert=yellow
+- mood drives color: urgent=red, warm=amber, neutral=default, positive=green, alert=yellow, overdue=deep orange (for tasks past their due date — distinct from urgent)
+- For overdue tasks, ALWAYS use mood "overdue" — this is distinct from "urgent" which is for things due today.
+- Write like a chief of staff: "Pack for Seattle — flight Monday." not "You have a trip..."
+- When an item corresponds to a task from the TASKS context, include the task's UUID in the "task_id" field. This enables 1-touch completion from the briefing.
+- For recurring (DAILY/WEEKLY) tasks, note the recurrence in the text naturally: "Daily cardio — not yet logged today."
 - Write like a chief of staff: "Pack for Seattle — flight Monday." not "You have a trip..."
 - 8-14 items. Most urgent first, FYI last.
 - FITNESS: If fitness goals exist, include a fitness item early in the list. If no activity logged today and there's a daily goal, mark it as mood "alert" with horizon "today" and category "health" with icon_hint "running shoe". If activity was logged, mark it "positive". Track streaks in the text.
@@ -152,7 +157,7 @@ ITEM RULES:
       tokens_used: inputTokens + outputTokens,
     }, { onConflict: "brief_date" });
 
-    res.json({ brief: { brief_date: today, content, tokens_used: inputTokens + outputTokens }, cached: false });
+    res.json({ brief: { brief_date: today, content, tokens_used: inputTokens + outputTokens, created_at: new Date().toISOString() }, cached: false });
   } catch (err) {
     res.status(500).json({ error: "Brief generation failed", detail: err.message });
   }

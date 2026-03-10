@@ -76,7 +76,7 @@ const C = {
   embers: "#6A7F94",
   success: "#5a8a6a",
   caution: "#b89040",
-  danger: "#9a4a4a",
+  danger: "#9a4a4a", overdue: "#D4721A",
   // Depth palette — for ambient effects
   void: "#0a0a0e",
   abyss: "#0e0e14",
@@ -287,6 +287,13 @@ const I = {
   pulse: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 12h4l3-8 4 16 3-8h4" />
+    </svg>
+  ),
+  fitness: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="17" cy="4" r="2"/>
+      <path d="M15 21l-3-6-4 3-3-4"/>
+      <path d="M19 13l-2-3-5 3"/>
     </svg>
   ),
   settings: (
@@ -1324,6 +1331,56 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
 
   useEffect(() => { fetchBrief(false); }, [fetchBrief]);
 
+  // Auto-refresh briefing at 5am, noon, 7pm CST
+  useEffect(() => {
+    const checkRefresh = () => {
+      if (!brief?.created_at) return;
+      const now = new Date();
+      const cst = new Date(now.toLocaleString("en-US", { timeZone: "America/Chicago" }));
+      const h = cst.getHours();
+      const m = cst.getMinutes();
+      const windows = [5, 12, 19]; // 5am, noon, 7pm CST
+      const createdAt = new Date(brief.created_at);
+      for (const w of windows) {
+        const windowTime = new Date(cst);
+        windowTime.setHours(w, 0, 0, 0);
+        if (cst >= windowTime && createdAt < windowTime) {
+          fetchBrief(true);
+          return;
+        }
+      }
+    };
+    checkRefresh();
+    const interval = setInterval(checkRefresh, 5 * 60 * 1000); // check every 5 min
+    return () => clearInterval(interval);
+  }, [brief?.created_at]);
+
+  // Complete a task from the briefing
+  const [completingId, setCompletingId] = useState(null);
+  const completeBriefTask = async (taskId) => {
+    setCompletingId(taskId);
+    try {
+      await fetch("/api/tasks", {
+        method: "PATCH", headers,
+        body: JSON.stringify({ id: taskId, completed: true }),
+      });
+      // Update brief state to remove the completed item
+      if (brief) {
+        const updated = { ...brief };
+        try {
+          const parsed = JSON.parse(updated.content.replace(/```json\s*|```/g, "").trim());
+          if (parsed.items) {
+            parsed.items = parsed.items.filter(it => it.task_id !== taskId);
+            updated.content = JSON.stringify(parsed);
+            setBrief(updated);
+          }
+        } catch {}
+      }
+      triggerRefresh();
+    } catch {}
+    setCompletingId(null);
+  };
+
   // Parse brief content — new format: {greeting, items[]}, fallback to old array or text
   let briefItems = [];
   let briefGreeting = null;
@@ -1361,6 +1418,7 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
     warm: "#B8924A",
     neutral: C.fog,
     positive: C.success,
+    overdue: "#D4721A",
   };
 
   const horizonLabels = {
@@ -1508,9 +1566,11 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
           {briefItems.map((item, i) => {
             const color = moodColors[item.mood] || C.fog;
             const isUrgent = item.horizon === "now" || item.mood === "urgent";
+            const isOverdue = item.mood === "overdue";
             const isNews = item.category === "news";
             const prevIsNews = i > 0 && briefItems[i - 1].category === "news";
             const showNewsDivider = isNews && !prevIsNews;
+            const bgDefault = isOverdue ? "rgba(212,114,26,0.06)" : isUrgent ? "rgba(154,74,74,0.06)" : i === 0 ? "rgba(123,143,163,0.04)" : "transparent";
             return (
               <React.Fragment key={i}>
                 {showNewsDivider && (
@@ -1527,18 +1587,32 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
                   display: "flex", alignItems: "flex-start", gap: isMobile ? "10px" : "16px",
                   padding: isMobile ? "12px 10px" : "14px 16px",
                   borderRadius: "6px",
-                  background: isUrgent ? "rgba(154,74,74,0.06)" : i === 0 ? "rgba(123,143,163,0.04)" : "transparent",
+                  background: bgDefault,
                   borderLeft: `2px solid ${color}`,
                   animation: `typeReveal 0.35s ease ${0.06 * i}s both`,
                   transition: "background 0.2s ease",
                 }}
                   onMouseEnter={e => e.currentTarget.style.background = "rgba(123,143,163,0.06)"}
-                  onMouseLeave={e => e.currentTarget.style.background = isUrgent ? "rgba(154,74,74,0.06)" : i === 0 ? "rgba(123,143,163,0.04)" : "transparent"}
+                  onMouseLeave={e => e.currentTarget.style.background = bgDefault}
                 >
-                {/* Icon */}
-                <div style={{ marginTop: "1px" }}>
-                  {iconFor(item.icon_hint, item.mood)}
-                </div>
+                {/* Complete button (if task_id exists) */}
+                {item.task_id ? (
+                  <button onClick={() => completeBriefTask(item.task_id)} disabled={completingId === item.task_id} style={{
+                    width: isMobile ? "28px" : "24px", height: isMobile ? "28px" : "24px", flexShrink: 0,
+                    borderRadius: "5px", cursor: "pointer", marginTop: "1px",
+                    background: completingId === item.task_id ? C.success : "rgba(90,138,106,0.08)",
+                    border: `1.5px solid ${completingId === item.task_id ? C.success : "rgba(90,138,106,0.25)"}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    transition: "all 0.25s ease", padding: 0,
+                  }}>
+                    <svg style={{ width: isMobile ? "14px" : "12px", height: isMobile ? "14px" : "12px", color: completingId === item.task_id ? C.obsidian : C.success }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
+                  </button>
+                ) : (
+                  /* Icon */
+                  <div style={{ marginTop: "1px" }}>
+                    {iconFor(item.icon_hint, item.mood)}
+                  </div>
+                )}
 
                 {/* Content */}
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -2115,6 +2189,7 @@ function TasksModule({ isMobile, session, refreshKey }) {
   const [newTitle, setNewTitle] = useState("");
   const [newPriority, setNewPriority] = useState("medium");
   const [newDue, setNewDue] = useState("");
+  const [newRecurrence, setNewRecurrence] = useState("");
 
   const headers = session?.access_token
     ? { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }
@@ -2139,9 +2214,9 @@ function TasksModule({ isMobile, session, refreshKey }) {
     try {
       await fetch("/api/tasks", {
         method: "POST", headers,
-        body: JSON.stringify({ title: newTitle.trim(), priority: newPriority, due_date: newDue || null }),
+        body: JSON.stringify({ title: newTitle.trim(), priority: newPriority, due_date: newDue || null, recurrence: newRecurrence || null }),
       });
-      setNewTitle(""); setNewPriority("medium"); setNewDue(""); setShowAdd(false);
+      setNewTitle(""); setNewPriority("medium"); setNewDue(""); setNewRecurrence(""); setShowAdd(false);
       fetchTasks();
     } catch {}
   };
@@ -2235,6 +2310,16 @@ function TasksModule({ isMobile, session, refreshKey }) {
         border: `1px solid ${priorityColors[task.priority]}30`,
         backgroundColor: `${priorityColors[task.priority]}10`,
       }}>{priorityLabels[task.priority]}</span>
+
+      {/* Recurrence badge */}
+      {task.recurrence && (
+        <span style={{
+          fontFamily: F.mono, fontSize: "7px", letterSpacing: "0.06em",
+          padding: "2px 6px", borderRadius: "3px",
+          color: "#6A8FA3", border: "1px solid rgba(106,143,163,0.3)",
+          backgroundColor: "rgba(106,143,163,0.08)",
+        }}>{task.recurrence === "daily" ? "DAILY" : "WEEKLY"}</span>
+      )}
 
       {/* Delete */}
       <button onClick={() => deleteTask(task.id)} style={{
@@ -2341,6 +2426,13 @@ function TasksModule({ isMobile, session, refreshKey }) {
             <input type="date" value={newDue} onChange={e => setNewDue(e.target.value)}
               style={{ ...inputStyle, width: "auto" }}
             />
+            <select value={newRecurrence} onChange={e => setNewRecurrence(e.target.value)} style={{
+              ...inputStyle, width: "auto", cursor: "pointer", color: newRecurrence ? "#6A8FA3" : C.iron,
+            }}>
+              <option value="">One-time</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+            </select>
             <button onClick={addTask} style={{
               background: C.amber, border: "none", borderRadius: "4px",
               padding: isMobile ? "10px 16px" : "8px 14px",
@@ -3682,7 +3774,7 @@ export default function BatcaveConsole() {
     { id: "finance", label: "Finance", icon: I.pulse },
     { id: "projects", label: "Projects", icon: I.workspace },
     { id: "agents", label: "Agents", icon: I.agent },
-    { id: "fitness", label: "Fitness", icon: I.pulse },
+    { id: "fitness", label: "Fitness", icon: I.fitness },
     { id: "integrations", label: "Integrations", icon: I.settings },
   ];
 
@@ -3746,7 +3838,7 @@ export default function BatcaveConsole() {
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v5.1 // batcave</span>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v5.2 // batcave</span>
           {auth.session && (
             <button onClick={auth.signOut} style={{
               background: "none", border: "none", cursor: "pointer",
