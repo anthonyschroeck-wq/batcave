@@ -15,7 +15,20 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     const { data } = await supabase.from("batcave_briefs")
       .select("*").eq("brief_date", today).single();
-    if (data) return res.json({ brief: data, cached: true });
+    if (data) {
+      // Clean cached content if needed
+      if (data.content && typeof data.content === "string") {
+        try {
+          let cleaned = data.content.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
+          const fb = cleaned.indexOf("{");
+          const lb = cleaned.lastIndexOf("}");
+          if (fb !== -1 && lb > fb) cleaned = cleaned.slice(fb, lb + 1);
+          JSON.parse(cleaned); // validate
+          data.content = cleaned;
+        } catch {}
+      }
+      return res.json({ brief: data, cached: true });
+    }
     return res.json({ brief: null, cached: false });
   }
 
@@ -87,6 +100,7 @@ AI USAGE THIS MONTH: $${(monthCost / 100).toFixed(2)}`;
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 1024,
+        temperature: 0,
         system: `You are Alfred — Tony's AI butler and chief of staff inside the Batcave command center. Generate a daily briefing as a JSON object.
 
 CRITICAL: Your entire response must be ONLY a valid JSON object. No thinking, no explanation, no markdown, no backticks, no preamble, no trailing text. Start with { and end with }. Nothing else.
