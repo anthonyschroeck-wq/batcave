@@ -1,5 +1,21 @@
 import { getSecret, getServiceClient } from "./_supabase.js";
 
+
+function safeParseBrief(content) {
+  if (!content) return null;
+  if (typeof content === "object" && content !== null && content.items) return content;
+  let raw = typeof content === "string" ? content : String(content);
+  // Unwrap double-stringification
+  if (raw.startsWith('"')) { try { raw = JSON.parse(raw); } catch {} }
+  if (typeof raw === "object" && raw !== null && raw.items) return raw;
+  if (typeof raw !== "string") raw = String(raw);
+  raw = raw.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
+  const fb = raw.indexOf("{"); const lb = raw.lastIndexOf("}");
+  if (fb === -1 || lb <= fb) return null;
+  raw = raw.slice(fb, lb + 1).replace(/,\s*([}\]])/g, "$1");
+  try { const p = JSON.parse(raw); if (p && p.items) return p; } catch {}
+  return null;
+}
 const SONNET_INPUT_COST = 3.0;
 const SONNET_OUTPUT_COST = 15.0;
 
@@ -185,7 +201,8 @@ ITEM RULES:
       created_at: now,
     }, { onConflict: "brief_date" });
 
-    res.json({ brief: { brief_date: today, content, tokens_used: inputTokens + outputTokens, created_at: now }, cached: false });
+    const parsed = safeParseBrief(content);
+    res.json({ brief: { brief_date: today, content, parsed, tokens_used: inputTokens + outputTokens, created_at: now }, cached: false });
   } catch (err) {
     res.status(500).json({ error: "Brief generation failed", detail: err.message });
   }

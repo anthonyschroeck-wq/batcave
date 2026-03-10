@@ -1364,70 +1364,57 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
         method: "PATCH", headers,
         body: JSON.stringify({ id: taskId, completed: true }),
       });
-      // Update brief state to remove the completed item
       if (brief) {
         const updated = { ...brief };
-        try {
-          const raw = typeof updated.content === "object" ? JSON.stringify(updated.content) : updated.content;
-          let cleaned = raw.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
-          const fb = cleaned.indexOf("{"); const lb = cleaned.lastIndexOf("}");
-          if (fb !== -1 && lb > fb) cleaned = cleaned.slice(fb, lb + 1);
-          cleaned = cleaned.replace(/,\s*([}\]])/g, "$1");
-          const parsed = JSON.parse(cleaned);
-          if (parsed.items) {
-            parsed.items = parsed.items.filter(it => it.task_id !== taskId);
-            updated.content = JSON.stringify(parsed);
-            setBrief(updated);
-          }
-        } catch {}
+        if (updated.parsed?.items) {
+          updated.parsed = { ...updated.parsed, items: updated.parsed.items.filter(it => it.task_id !== taskId) };
+        }
+        setBrief(updated);
       }
       triggerRefresh();
     } catch {}
     setCompletingId(null);
   };
 
-  // Parse brief content — new format: {greeting, items[]}, fallback to old array or text
+  // Parse brief — prefer server-parsed object, fallback to client parsing
   let briefItems = [];
   let briefGreeting = null;
-  let briefQuote = null; // { text, author, source }
-  if (brief?.content) {
-    try {
-      let raw = typeof brief.content === "object" ? JSON.stringify(brief.content) : brief.content;
-      // Strip markdown code fences
-      raw = raw.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
-      // Strip any preamble before the first { and after the last }
-      const firstBrace = raw.indexOf("{");
-      const lastBrace = raw.lastIndexOf("}");
-      if (firstBrace !== -1 && lastBrace > firstBrace) {
-        raw = raw.slice(firstBrace, lastBrace + 1);
+  let briefQuote = null;
+  if (brief) {
+    const p = brief.parsed || null;
+    if (p && p.items) {
+      briefGreeting = p.greeting || null;
+      if (p.quote_text) {
+        briefQuote = { text: p.quote_text, author: p.quote_author || "Unknown", source: p.quote_source || null };
       }
-      // Fix trailing commas (common AI JSON error)
-      raw = raw.replace(/,\s*([}\]])/g, "$1");
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && parsed.items) {
-        briefGreeting = parsed.greeting || null;
-        if (parsed.quote_text) {
-          briefQuote = {
-            text: parsed.quote_text,
-            author: parsed.quote_author || "Unknown",
-            source: parsed.quote_source || null,
-          };
+      briefItems = Array.isArray(p.items) ? p.items : [];
+    } else if (brief.content) {
+      // Fallback: client-side parsing
+      try {
+        let raw = typeof brief.content === "object" ? JSON.stringify(brief.content) : brief.content;
+        if (raw.startsWith('"')) { try { raw = JSON.parse(raw); } catch {} }
+        if (typeof raw === "object" && raw.items) {
+          briefGreeting = raw.greeting || null;
+          briefItems = raw.items;
+        } else {
+          if (typeof raw !== "string") raw = String(raw);
+          raw = raw.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
+          const fb = raw.indexOf("{"); const lb = raw.lastIndexOf("}");
+          if (fb !== -1 && lb > fb) raw = raw.slice(fb, lb + 1);
+          raw = raw.replace(/,\s*([}\]])/g, "$1");
+          const parsed = JSON.parse(raw);
+          if (parsed?.items) {
+            briefGreeting = parsed.greeting || null;
+            if (parsed.quote_text) {
+              briefQuote = { text: parsed.quote_text, author: parsed.quote_author || "Unknown", source: parsed.quote_source || null };
+            }
+            briefItems = parsed.items;
+          }
         }
-        briefItems = Array.isArray(parsed.items) ? parsed.items : [];
-      } else if (Array.isArray(parsed)) {
-        // Old format: flat array
-        briefItems = parsed;
+      } catch {
+        // Last resort: don't render garbage
+        briefItems = [];
       }
-    } catch {
-      // Fallback: treat as plain text lines, but skip lines that look like raw JSON
-      const lines = (typeof brief.content === "string" ? brief.content : "").split("\n").filter(l => {
-        const t = l.trim();
-        return t && t !== "{" && t !== "}" && t !== "[" && t !== "]" && !t.startsWith('"greeting"') && !t.startsWith('"quote_') && !t.startsWith('"items"');
-      });
-      briefItems = lines.map(l => ({
-        text: l.trim().replace(/^[-*]\s*/, "").replace(/^"text":\s*"?/, "").replace(/"?,?\s*$/, ""),
-        horizon: "today", mood: "neutral", category: "task", icon_hint: "circle",
-      }));
     }
   }
 
