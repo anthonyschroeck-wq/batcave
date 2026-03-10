@@ -137,9 +137,19 @@ ITEM RULES:
     }
 
     const data = await response.json();
-    const content = data.content?.map(c => c.text || "").join("") || "";
+    let content = data.content?.map(c => c.text || "").join("") || "";
     const inputTokens = data.usage?.input_tokens || 0;
     const outputTokens = data.usage?.output_tokens || 0;
+
+    // Clean the AI response — extract pure JSON, strip preamble/fences/thinking
+    try {
+      let cleaned = content.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
+      const fb = cleaned.indexOf("{");
+      const lb = cleaned.lastIndexOf("}");
+      if (fb !== -1 && lb > fb) cleaned = cleaned.slice(fb, lb + 1);
+      JSON.parse(cleaned); // validate it's actual JSON
+      content = cleaned; // store only the clean JSON
+    } catch {}
 
     // Log usage
     const costCents = (inputTokens / 1000000 * SONNET_INPUT_COST + outputTokens / 1000000 * SONNET_OUTPUT_COST) * 100;
@@ -151,13 +161,15 @@ ITEM RULES:
     });
 
     // Upsert brief
+    const now = new Date().toISOString();
     await supabase.from("batcave_briefs").upsert({
       brief_date: today, content,
       context_snapshot: { tasks: tasks.length, events: events.length, overdue: overdue.length },
       tokens_used: inputTokens + outputTokens,
+      created_at: now,
     }, { onConflict: "brief_date" });
 
-    res.json({ brief: { brief_date: today, content, tokens_used: inputTokens + outputTokens, created_at: new Date().toISOString() }, cached: false });
+    res.json({ brief: { brief_date: today, content, tokens_used: inputTokens + outputTokens, created_at: now }, cached: false });
   } catch (err) {
     res.status(500).json({ error: "Brief generation failed", detail: err.message });
   }
