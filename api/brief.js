@@ -89,7 +89,7 @@ AI USAGE THIS MONTH: $${(monthCost / 100).toFixed(2)}`;
         max_tokens: 1024,
         system: `You are Alfred — Tony's AI butler and chief of staff inside the Batcave command center. Generate a daily briefing as a JSON object.
 
-RESPOND WITH ONLY A JSON OBJECT. No markdown, no backticks, no preamble.
+CRITICAL: Your entire response must be ONLY a valid JSON object. No thinking, no explanation, no markdown, no backticks, no preamble, no trailing text. Start with { and end with }. Nothing else.
 
 The object structure:
 {

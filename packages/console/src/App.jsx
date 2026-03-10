@@ -1368,7 +1368,11 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
       if (brief) {
         const updated = { ...brief };
         try {
-          const parsed = JSON.parse(updated.content.replace(/```json\s*|```/g, "").trim());
+          const raw = typeof updated.content === "object" ? JSON.stringify(updated.content) : updated.content;
+          let cleaned = raw.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
+          const fb = cleaned.indexOf("{"); const lb = cleaned.lastIndexOf("}");
+          if (fb !== -1 && lb > fb) cleaned = cleaned.slice(fb, lb + 1);
+          const parsed = JSON.parse(cleaned);
           if (parsed.items) {
             parsed.items = parsed.items.filter(it => it.task_id !== taskId);
             updated.content = JSON.stringify(parsed);
@@ -1387,8 +1391,16 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
   let briefQuote = null; // { text, author, source }
   if (brief?.content) {
     try {
-      const cleaned = brief.content.replace(/```json\s*|```/g, "").trim();
-      const parsed = JSON.parse(cleaned);
+      let raw = typeof brief.content === "object" ? JSON.stringify(brief.content) : brief.content;
+      // Strip markdown code fences
+      raw = raw.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
+      // Strip any preamble before the first { and after the last }
+      const firstBrace = raw.indexOf("{");
+      const lastBrace = raw.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace > firstBrace) {
+        raw = raw.slice(firstBrace, lastBrace + 1);
+      }
+      const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && parsed.items) {
         briefGreeting = parsed.greeting || null;
         if (parsed.quote_text) {
@@ -1404,9 +1416,13 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
         briefItems = parsed;
       }
     } catch {
-      // Fallback: treat as plain text lines
-      briefItems = brief.content.split("\n").filter(l => l.trim()).map(l => ({
-        text: l.trim().replace(/^[-*]\s*/, ""),
+      // Fallback: treat as plain text lines, but skip lines that look like raw JSON
+      const lines = (typeof brief.content === "string" ? brief.content : "").split("\n").filter(l => {
+        const t = l.trim();
+        return t && t !== "{" && t !== "}" && t !== "[" && t !== "]" && !t.startsWith('"greeting"') && !t.startsWith('"quote_') && !t.startsWith('"items"');
+      });
+      briefItems = lines.map(l => ({
+        text: l.trim().replace(/^[-*]\s*/, "").replace(/^"text":\s*"?/, "").replace(/"?,?\s*$/, ""),
         horizon: "today", mood: "neutral", category: "task", icon_hint: "circle",
       }));
     }
@@ -1545,11 +1561,6 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
           <span style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate, letterSpacing: "0.08em" }}>
             {brief?.brief_date || ""}
           </span>
-          {briefItems.length > 0 && !briefItems.some(it => it.category === "news") && (
-            <span style={{ fontFamily: F.mono, fontSize: "8px", color: C.caution }}>
-              news not loaded — regenerate
-            </span>
-          )}
         </div>
         <button onClick={() => fetchBrief(true)} disabled={briefLoading} style={{
           background: "transparent",
