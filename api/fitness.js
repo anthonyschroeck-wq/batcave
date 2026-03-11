@@ -42,18 +42,13 @@ export default async function handler(req, res) {
     const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const ninetyAgo = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
 
-    const [goalsRes, weekLogRes, monthLogRes, todayLogRes, weightRes] = await Promise.all([
-      userClient.from("batcave_fitness_goals").select("*").eq("status", "active").order("created_at"),
-      userClient.from("batcave_fitness_log").select("*").gte("activity_date", weekAgo).order("activity_date", { ascending: false }),
-      userClient.from("batcave_fitness_log").select("*").gte("activity_date", monthAgo),
-      userClient.from("batcave_fitness_log").select("*").eq("activity_date", today),
-      userClient.from("batcave_weight_log").select("*").gte("logged_date", ninetyAgo).order("logged_date", { ascending: true }),
-    ]);
-
-    const goals = goalsRes.data || [];
-    const weekLog = weekLogRes.data || [];
-    const monthLog = monthLogRes.data || [];
-    const todayLog = todayLogRes.data || [];
+    // Each query wrapped individually — one failure can't kill the whole endpoint
+    let goals = [], weekLog = [], monthLog = [], todayLog = [], weightData = [];
+    try { const r = await userClient.from("batcave_fitness_goals").select("*").eq("status", "active").order("created_at"); goals = r.data || []; } catch {}
+    try { const r = await userClient.from("batcave_fitness_log").select("*").gte("activity_date", weekAgo).order("activity_date", { ascending: false }); weekLog = r.data || []; } catch {}
+    try { const r = await userClient.from("batcave_fitness_log").select("*").gte("activity_date", monthAgo); monthLog = r.data || []; } catch {}
+    try { const r = await userClient.from("batcave_fitness_log").select("*").eq("activity_date", today); todayLog = r.data || []; } catch {}
+    try { const r = await userClient.from("batcave_weight_log").select("*").gte("logged_date", ninetyAgo).order("logged_date", { ascending: true }); weightData = r.data || []; } catch {}
 
     // Calculate goal progress
     const goalProgress = goals.map(g => {
@@ -98,7 +93,6 @@ export default async function handler(req, res) {
     };
 
     // Weight trend
-    const weightData = weightRes.data || [];
     const latestWeight = weightData.length > 0 ? weightData[weightData.length - 1] : null;
     const weightTrend = weightData.map(w => ({ date: w.logged_date, lbs: parseFloat(w.weight_lbs) }));
 
