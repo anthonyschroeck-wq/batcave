@@ -123,6 +123,15 @@ async function executeActions(actions, jwt) {
             source: "alfred",
           }).select().single();
         results.push({ action: "log_activity", ok: true, entry: data });
+      } else if (action.type === "log_weight") {
+        const { data } = await supabase.from("batcave_weight_log")
+          .insert({
+            user_id: userId,
+            weight_lbs: parseFloat(action.weight_lbs),
+            notes: action.notes || null,
+            logged_date: action.logged_date || new Date().toISOString().slice(0, 10),
+          }).select().single();
+        results.push({ action: "log_weight", ok: true, entry: data });
       }
     } catch (e) {
       results.push({ action: action.type, ok: false, error: e.message });
@@ -162,7 +171,8 @@ CAPABILITIES — you can take actions by including a JSON block in your response
   {"type": "update_event", "id": "event-uuid", "title": "...", "start_date": "...", "end_date": "...", "category": "...", "location": "..."},
   {"type": "delete_event", "id": "event-uuid"},
   {"type": "create_fitness_goal", "title": "...", "category": "cardio|strength|flexibility|recovery", "target_type": "frequency|duration|distance", "target_value": 1, "target_unit": "sessions|minutes|miles", "target_period": "day|week|month"},
-  {"type": "log_activity", "activity_type": "run|walk|cycle|swim|strength|yoga|other", "title": "...", "duration_minutes": 30, "distance_miles": 3.1, "calories": 250, "activity_date": "YYYY-MM-DD"}
+  {"type": "log_activity", "activity_type": "run|walk|cycle|swim|strength|yoga|other", "title": "...", "duration_minutes": 30, "distance_miles": 3.1, "calories": 250, "activity_date": "YYYY-MM-DD"},
+  {"type": "log_weight", "weight_lbs": 185.5, "notes": "...", "logged_date": "YYYY-MM-DD"}
 ]
 \`\`\`
 
@@ -180,6 +190,7 @@ RULES:
   - "hit the gym, chest and tris, 45 min" → log_activity with activity_type:"strength", duration_minutes:45, title:"Chest and triceps"
   - "log my cardio" (no details) → log_activity with activity_type:"run", title:"Cardio session"
 - Always calculate duration from pace+distance if given (e.g. 3 miles at 10min/mile = 30 minutes).
+- "I weigh 185" or "weight 185.5" or "log weight 190" → log_weight with weight_lbs. Parse the number from natural language.
 - Today's date is ${new Date().toISOString().slice(0, 10)}.
 - Dates like "friday", "next tuesday" should resolve to actual YYYY-MM-DD dates.`;
 

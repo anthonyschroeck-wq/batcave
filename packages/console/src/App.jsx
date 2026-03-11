@@ -3491,8 +3491,10 @@ function FitnessModule({ isMobile, session }) {
   const [loading, setLoading] = useState(true);
   const [showLog, setShowLog] = useState(false);
   const [showGoal, setShowGoal] = useState(false);
+  const [showWeight, setShowWeight] = useState(false);
   const [logForm, setLogForm] = useState({ activity_type: "run", title: "", duration_minutes: "", distance_miles: "", notes: "", activity_date: new Date().toISOString().slice(0, 10) });
   const [goalForm, setGoalForm] = useState({ title: "", category: "cardio", target_type: "frequency", target_value: 1, target_unit: "sessions", target_period: "day" });
+  const [weightForm, setWeightForm] = useState({ weight_lbs: "", notes: "", logged_date: new Date().toISOString().slice(0, 10) });
 
   const headers = session?.access_token
     ? { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }
@@ -3524,6 +3526,14 @@ function FitnessModule({ isMobile, session }) {
     fetchData();
   };
 
+  const logWeight = async () => {
+    if (!weightForm.weight_lbs) return;
+    await fetch("/api/fitness", { method: "POST", headers, body: JSON.stringify({ action: "log_weight", ...weightForm, weight_lbs: parseFloat(weightForm.weight_lbs) }) });
+    setShowWeight(false);
+    setWeightForm({ weight_lbs: "", notes: "", logged_date: new Date().toISOString().slice(0, 10) });
+    fetchData();
+  };
+
   const activityIcons = {
     run: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ width: 16, height: 16 }}><circle cx="17" cy="4" r="2"/><path d="M15 21l-3-6-4 3-3-4"/><path d="M19 13l-2-3-5 3"/></svg>,
     cycle: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ width: 16, height: 16 }}><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17L9 4h4l3 5h2"/></svg>,
@@ -3540,6 +3550,9 @@ function FitnessModule({ isMobile, session }) {
   const stats = data?.stats || {};
   const goals = data?.goals || [];
   const recentLog = data?.recentLog || [];
+  const weightData = data?.weight || {};
+  const weightTrend = weightData.trend || [];
+  const latestWeight = weightData.latest ? parseFloat(weightData.latest.weight_lbs) : null;
 
   return (
     <div style={{ animation: "fadeUp 0.4s ease both" }}>
@@ -3554,7 +3567,7 @@ function FitnessModule({ isMobile, session }) {
           { label: "This Month", value: stats.thisMonth || 0, color: C.fog },
           { label: "Minutes", value: stats.totalMinutes || 0, color: C.fog },
           { label: "Miles", value: stats.totalMiles || "0", color: C.fog },
-          { label: "Weight", value: stats.currentWeight ? `${stats.currentWeight} lbs` : "--", color: stats.currentWeight ? C.cream : C.slate },
+          { label: "Weight", value: latestWeight ? `${latestWeight}` : "--", color: latestWeight ? C.cream : C.slate },
         ].map(s => (
           <div key={s.label} style={{
             background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
@@ -3567,13 +3580,18 @@ function FitnessModule({ isMobile, session }) {
       </div>
 
       {/* Action bar */}
-      <div style={{ display: "flex", gap: "8px", marginBottom: "24px" }}>
-        <button onClick={() => { setShowLog(!showLog); setShowGoal(false); }} style={{
+      <div style={{ display: "flex", gap: "8px", marginBottom: "24px", flexWrap: "wrap" }}>
+        <button onClick={() => { setShowLog(!showLog); setShowGoal(false); setShowWeight(false); }} style={{
           background: showLog ? C.stone : C.success, border: "none", borderRadius: "4px",
           padding: isMobile ? "10px 16px" : "6px 14px", fontFamily: F.mono, fontSize: "11px", fontWeight: 600,
           color: showLog ? C.iron : C.obsidian, cursor: "pointer", minHeight: isMobile ? "44px" : undefined,
         }}>{showLog ? "cancel" : "+ log activity"}</button>
-        <button onClick={() => { setShowGoal(!showGoal); setShowLog(false); }} style={{
+        <button onClick={() => { setShowWeight(!showWeight); setShowLog(false); setShowGoal(false); }} style={{
+          background: showWeight ? C.stone : "none", border: showWeight ? "none" : `1px solid ${C.stone}`, borderRadius: "4px",
+          padding: isMobile ? "10px 16px" : "6px 14px", fontFamily: F.mono, fontSize: "11px",
+          color: showWeight ? C.iron : C.cream, cursor: "pointer", minHeight: isMobile ? "44px" : undefined,
+        }}>{showWeight ? "cancel" : "+ log weight"}</button>
+        <button onClick={() => { setShowGoal(!showGoal); setShowLog(false); setShowWeight(false); }} style={{
           background: "none", border: `1px solid ${C.stone}`, borderRadius: "4px",
           padding: isMobile ? "10px 16px" : "6px 14px", fontFamily: F.mono, fontSize: "11px",
           color: C.amber, cursor: "pointer", minHeight: isMobile ? "44px" : undefined,
@@ -3630,6 +3648,134 @@ function FitnessModule({ isMobile, session }) {
             padding: isMobile ? "12px 20px" : "8px 16px", fontFamily: F.mono, fontSize: "11px", fontWeight: 600,
             color: goalForm.title ? C.obsidian : C.iron, cursor: goalForm.title ? "pointer" : "not-allowed",
           }}>create goal</button>
+        </div>
+      )}
+
+      {/* Weight form */}
+      {showWeight && (
+        <div style={{
+          background: C.cavern, border: `1px solid ${C.cream}30`, borderRadius: "6px",
+          padding: isMobile ? "16px" : "16px 20px", marginBottom: "20px", animation: "fadeUp 0.2s ease both",
+        }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 2fr", gap: "10px", marginBottom: "10px" }}>
+            <input type="number" step="0.1" value={weightForm.weight_lbs} onChange={e => setWeightForm({...weightForm, weight_lbs: e.target.value})} placeholder="Weight (lbs)" style={inputStyle} />
+            <input type="date" value={weightForm.logged_date} onChange={e => setWeightForm({...weightForm, logged_date: e.target.value})} style={inputStyle} />
+            <input value={weightForm.notes} onChange={e => setWeightForm({...weightForm, notes: e.target.value})} placeholder="Notes (optional)" style={inputStyle} />
+          </div>
+          <button onClick={logWeight} disabled={!weightForm.weight_lbs} style={{
+            background: weightForm.weight_lbs ? C.cream : C.stone, border: "none", borderRadius: "4px",
+            padding: isMobile ? "12px 20px" : "8px 16px", fontFamily: F.mono, fontSize: "11px", fontWeight: 600,
+            color: weightForm.weight_lbs ? C.obsidian : C.iron, cursor: weightForm.weight_lbs ? "pointer" : "not-allowed",
+          }}>log weight</button>
+        </div>
+      )}
+
+      {/* Weight Trend */}
+      {weightTrend.length >= 2 && (() => {
+        const W = isMobile ? 320 : 520;
+        const H = 140;
+        const pad = { t: 12, r: 12, b: 28, l: 40 };
+        const cw = W - pad.l - pad.r;
+        const ch = H - pad.t - pad.b;
+
+        const vals = weightTrend.map(w => w.lbs);
+        const minW = Math.floor(Math.min(...vals) - 1);
+        const maxW = Math.ceil(Math.max(...vals) + 1);
+        const range = maxW - minW || 1;
+
+        const points = weightTrend.map((w, i) => {
+          const x = pad.l + (i / (weightTrend.length - 1)) * cw;
+          const y = pad.t + ch - ((w.lbs - minW) / range) * ch;
+          return { x, y, ...w };
+        });
+        const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+
+        // Gradient fill path
+        const fillD = pathD + ` L${points[points.length-1].x.toFixed(1)},${pad.t + ch} L${points[0].x.toFixed(1)},${pad.t + ch} Z`;
+
+        // Y-axis labels (3 ticks)
+        const yTicks = [minW, Math.round((minW + maxW) / 2), maxW];
+
+        // X-axis labels (first, middle, last dates)
+        const xLabels = [
+          { x: pad.l, label: weightTrend[0].date.slice(5) },
+          { x: pad.l + cw / 2, label: weightTrend[Math.floor(weightTrend.length / 2)].date.slice(5) },
+          { x: pad.l + cw, label: weightTrend[weightTrend.length - 1].date.slice(5) },
+        ];
+
+        const delta = vals[vals.length - 1] - vals[0];
+        const trendColor = delta < 0 ? C.success : delta > 0 ? "#D4721A" : C.fog;
+
+        return (
+          <div style={{ marginBottom: "28px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+              <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.08em" }}>WEIGHT TREND</div>
+              {delta !== 0 && <div style={{ fontFamily: F.mono, fontSize: "10px", color: trendColor }}>
+                {delta > 0 ? "+" : ""}{delta.toFixed(1)} lbs
+              </div>}
+            </div>
+            <div style={{
+              background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "8px",
+              padding: "16px", overflow: "hidden",
+            }}>
+              <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
+                <defs>
+                  <linearGradient id="weightGrad" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor={C.amber} stopOpacity="0.15" />
+                    <stop offset="100%" stopColor={C.amber} stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+
+                {/* Grid lines */}
+                {yTicks.map(tick => {
+                  const y = pad.t + ch - ((tick - minW) / range) * ch;
+                  return <line key={tick} x1={pad.l} x2={pad.l + cw} y1={y} y2={y} stroke={C.stone} strokeWidth="0.5" />;
+                })}
+
+                {/* Fill */}
+                <path d={fillD} fill="url(#weightGrad)" />
+
+                {/* Line */}
+                <path d={pathD} fill="none" stroke={C.amber} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+
+                {/* Data points */}
+                {points.map((p, i) => (
+                  <circle key={i} cx={p.x} cy={p.y} r={i === points.length - 1 ? 3.5 : 2} fill={i === points.length - 1 ? C.cream : C.amber} stroke={C.cavern} strokeWidth="1" />
+                ))}
+
+                {/* Y axis labels */}
+                {yTicks.map(tick => {
+                  const y = pad.t + ch - ((tick - minW) / range) * ch;
+                  return <text key={tick} x={pad.l - 6} y={y + 3} textAnchor="end" fill={C.iron} fontSize="8" fontFamily="'IBM Plex Mono', monospace">{tick}</text>;
+                })}
+
+                {/* X axis labels */}
+                {xLabels.map((l, i) => (
+                  <text key={i} x={l.x} y={H - 4} textAnchor={i === 0 ? "start" : i === 2 ? "end" : "middle"} fill={C.iron} fontSize="7" fontFamily="'IBM Plex Mono', monospace">{l.label}</text>
+                ))}
+
+                {/* Latest value label */}
+                {points.length > 0 && (() => {
+                  const last = points[points.length - 1];
+                  return <text x={last.x} y={last.y - 8} textAnchor="middle" fill={C.cream} fontSize="10" fontWeight="600" fontFamily="'Source Sans 3', sans-serif">{last.lbs}</text>;
+                })()}
+              </svg>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Single weight entry — show if less than 2 data points */}
+      {weightTrend.length > 0 && weightTrend.length < 2 && (
+        <div style={{ marginBottom: "28px" }}>
+          <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.08em", marginBottom: "10px" }}>WEIGHT</div>
+          <div style={{
+            background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "8px",
+            padding: "20px", textAlign: "center",
+          }}>
+            <div style={{ fontFamily: F.display, fontSize: "32px", color: C.cream, fontWeight: 300 }}>{weightTrend[0].lbs} lbs</div>
+            <div style={{ fontFamily: F.mono, fontSize: "9px", color: C.iron, marginTop: "4px" }}>Logged {weightTrend[0].date}. Add more entries to see the trend.</div>
+          </div>
         </div>
       )}
 

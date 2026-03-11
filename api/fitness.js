@@ -28,16 +28,26 @@ export default async function handler(req, res) {
       return res.json({ log: data || [], days });
     }
 
-    // Default: summary — goals + recent log + stats
+    if (action === "weight") {
+      const days = parseInt(req.query.days) || 90;
+      const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+      const { data } = await userClient.from("batcave_weight_log")
+        .select("*").gte("logged_date", since).order("logged_date", { ascending: true });
+      return res.json({ weight: data || [], days });
+    }
+
+    // Default: summary — goals + recent log + stats + weight trend
     const today = new Date().toISOString().slice(0, 10);
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
     const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const ninetyAgo = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
 
-    const [goalsRes, weekLogRes, monthLogRes, todayLogRes] = await Promise.all([
+    const [goalsRes, weekLogRes, monthLogRes, todayLogRes, weightRes] = await Promise.all([
       userClient.from("batcave_fitness_goals").select("*").eq("status", "active").order("created_at"),
       userClient.from("batcave_fitness_log").select("*").gte("activity_date", weekAgo).order("activity_date", { ascending: false }),
       userClient.from("batcave_fitness_log").select("*").gte("activity_date", monthAgo),
       userClient.from("batcave_fitness_log").select("*").eq("activity_date", today),
+      userClient.from("batcave_weight_log").select("*").gte("logged_date", ninetyAgo).order("logged_date", { ascending: true }),
     ]);
 
     const goals = goalsRes.data || [];
@@ -87,7 +97,12 @@ export default async function handler(req, res) {
       loggedToday: todayLog.length > 0,
     };
 
-    return res.json({ goals: goalProgress, recentLog: weekLog.slice(0, 10), stats, today });
+    // Weight trend
+    const weightData = weightRes.data || [];
+    const latestWeight = weightData.length > 0 ? weightData[weightData.length - 1] : null;
+    const weightTrend = weightData.map(w => ({ date: w.logged_date, lbs: parseFloat(w.weight_lbs) }));
+
+    return res.json({ goals: goalProgress, recentLog: weekLog.slice(0, 10), stats, today, weight: { latest: latestWeight, trend: weightTrend, count: weightData.length } });
   }
 
   // ─── POST ─────────────────────────────────────────────────
@@ -135,6 +150,23 @@ export default async function handler(req, res) {
 
     if (body.action === "delete_log") {
       await userClient.from("batcave_fitness_log").delete().eq("id", body.id);
+      return res.json({ deleted: true });
+    }
+
+    if (body.action === "log_weight") {
+      if (!body.weight_lbs) return res.status(400).json({ error: "weight_lbs required" });
+      const { data, error } = await userClient.from("batcave_weight_log").insert({
+        user_id: user.id,
+        weight_lbs: parseFloat(body.weight_lbs),
+        notes: body.notes || null,
+        logged_date: body.logged_date || new Date().toISOString().slice(0, 10),
+      }).select().single();
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ entry: data });
+    }
+
+    if (body.action === "delete_weight") {
+      await userClient.from("batcave_weight_log").delete().eq("id", body.id);
       return res.json({ deleted: true });
     }
 
