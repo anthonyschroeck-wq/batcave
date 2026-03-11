@@ -1063,13 +1063,15 @@ function Alfred({ isMobile, session, triggerRefresh }) {
   const [response, setResponse] = useState(null);
   const [actions, setActions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [voiceActive, setVoiceActive] = useState(false);
+  const voiceRecRef = useRef(null);
 
   const connected = !!session?.access_token;
 
-  const send = async () => {
-    if (!input.trim() || loading || !connected) return;
-    const msg = input.trim();
-    setInput("");
+  const send = async (msg) => {
+    const text = msg || input.trim();
+    if (!text || loading || !connected) return;
+    if (!msg) setInput("");
     setLoading(true);
     setResponse(null);
     setActions([]);
@@ -1081,7 +1083,7 @@ function Alfred({ isMobile, session, triggerRefresh }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ message: msg }),
+        body: JSON.stringify({ message: text }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -1095,6 +1097,26 @@ function Alfred({ isMobile, session, triggerRefresh }) {
       setResponse("Network error");
     }
     setLoading(false);
+  };
+
+  const toggleVoice = () => {
+    if (voiceActive) {
+      if (voiceRecRef.current) voiceRecRef.current.stop();
+      setVoiceActive(false);
+      return;
+    }
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) { setResponse("Speech recognition not supported."); return; }
+    const rec = new SpeechRecognition();
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.lang = "en-US";
+    voiceRecRef.current = rec;
+    rec.onresult = (event) => { const spoken = event.results[0][0].transcript; setInput(spoken); send(spoken); };
+    rec.onerror = () => setVoiceActive(false);
+    rec.onend = () => setVoiceActive(false);
+    rec.start();
+    setVoiceActive(true);
   };
 
   return (
@@ -1121,6 +1143,19 @@ function Alfred({ isMobile, session, triggerRefresh }) {
             }}
           />
         </div>
+        {/* Voice mic button */}
+        {connected && (
+          <button onClick={toggleVoice} style={{
+            background: voiceActive ? C.danger : "rgba(22,22,32,0.4)",
+            border: `1px solid ${voiceActive ? C.danger : "rgba(70,70,90,0.25)"}`,
+            borderRadius: "8px", padding: isMobile ? "10px" : "8px",
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "all 0.2s ease", flexShrink: 0,
+            animation: voiceActive ? "glowPulse 1.5s ease infinite" : "none",
+          }}>
+            <div style={{ width: "18px", height: "18px", color: voiceActive ? C.cream : C.amber }}>{I.voice}</div>
+          </button>
+        )}
         {connected && input.trim() && (
           <button onClick={send} disabled={loading} style={{
             background: C.amber, border: "none", borderRadius: "6px",
@@ -1404,7 +1439,7 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
     if (p && p.items) {
       briefGreeting = p.greeting || null;
       if (p.quote_text) {
-        briefQuote = { text: p.quote_text, author: p.quote_author || "Unknown", source: p.quote_source || null };
+        briefQuote = { text: p.quote_text, author: p.quote_author || "Unknown", source: p.quote_source || null, url: p.quote_url || null };
       }
       briefItems = Array.isArray(p.items) ? p.items : [];
     } else if (brief.content) {
@@ -1425,7 +1460,7 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
           if (parsed?.items) {
             briefGreeting = parsed.greeting || null;
             if (parsed.quote_text) {
-              briefQuote = { text: parsed.quote_text, author: parsed.quote_author || "Unknown", source: parsed.quote_source || null };
+              briefQuote = { text: parsed.quote_text, author: parsed.quote_author || "Unknown", source: parsed.quote_source || null, url: parsed.quote_url || null };
             }
             briefItems = parsed.items;
           }
@@ -1484,80 +1519,42 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
         <Alfred isMobile={isMobile} session={session} triggerRefresh={triggerRefresh} />
       </div>
 
-      {/* Alfred's greeting */}
+      {/* Alfred's greeting — single line with quote */}
       {(briefGreeting || briefQuote) && (
         <div style={{
           marginBottom: "28px",
           animation: "typeReveal 0.5s ease both",
+          maxWidth: "720px",
         }}>
-          {briefGreeting && (
-            <div style={{
-              fontFamily: F.display, fontSize: isMobile ? "18px" : "22px",
-              color: C.cream, lineHeight: 1.5, fontWeight: 300,
-              fontStyle: "italic", maxWidth: "640px",
-              marginBottom: briefQuote ? "12px" : 0,
-            }}>{briefGreeting}</div>
-          )}
-          {briefQuote && (
-            <div style={{ position: "relative", display: "inline-block", maxWidth: "640px" }}
-              onMouseEnter={e => {
-                const tip = e.currentTarget.querySelector("[data-tip]");
-                if (tip) tip.style.opacity = "1";
-                if (tip) tip.style.transform = "translateY(0)";
-              }}
-              onMouseLeave={e => {
-                const tip = e.currentTarget.querySelector("[data-tip]");
-                if (tip) tip.style.opacity = "0";
-                if (tip) tip.style.transform = "translateY(4px)";
-              }}
-              onClick={e => {
-                // Mobile: toggle on tap
-                const tip = e.currentTarget.querySelector("[data-tip]");
-                if (tip) {
-                  const showing = tip.style.opacity === "1";
-                  tip.style.opacity = showing ? "0" : "1";
-                  tip.style.transform = showing ? "translateY(4px)" : "translateY(0)";
-                }
-              }}
-            >
-              <span style={{
-                fontFamily: F.body, fontSize: isMobile ? "14px" : "15px",
-                color: C.amber, lineHeight: 1.6, fontWeight: 300,
-                fontStyle: "italic",
-                cursor: "pointer",
-                borderBottom: "1px dotted rgba(123,143,163,0.3)",
-                paddingBottom: "1px",
-              }}>
-                "{briefQuote.text}"
-              </span>
-
-              {/* Attribution tooltip */}
-              <div data-tip="true" style={{
-                position: "absolute",
-                bottom: "calc(100% + 8px)", left: 0,
-                background: C.cavern,
-                border: `1px solid ${C.stone}`,
-                borderRadius: "6px",
-                padding: isMobile ? "10px 14px" : "8px 12px",
-                opacity: 0,
-                transform: "translateY(4px)",
-                transition: "opacity 0.2s ease, transform 0.2s ease",
-                pointerEvents: "none",
-                zIndex: 10,
-                whiteSpace: "nowrap",
-                boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
-              }}>
-                <div style={{ fontFamily: F.sans, fontSize: "12px", color: C.cream, fontWeight: 500 }}>
-                  {briefQuote.author}
-                </div>
-                {briefQuote.source && (
-                  <div style={{ fontFamily: F.mono, fontSize: "10px", color: C.iron, marginTop: "2px" }}>
-                    {briefQuote.source}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          <div style={{
+            fontFamily: F.display, fontSize: isMobile ? "18px" : "22px",
+            color: C.cream, lineHeight: 1.6, fontWeight: 300,
+            fontStyle: "italic",
+          }}>
+            {briefGreeting || "Good evening, Master Tony."}
+            {briefQuote && (
+              <>
+                {" "}
+                <span style={{ color: C.amber, borderBottom: "1px dotted rgba(123,143,163,0.3)" }}>
+                  "{briefQuote.text}"
+                </span>
+                <span style={{ fontFamily: F.sans, fontSize: isMobile ? "12px" : "13px", fontStyle: "normal", fontWeight: 400, color: C.iron, marginLeft: "8px" }}>
+                  — {briefQuote.author}
+                  {briefQuote.source && <span style={{ color: C.slate }}>, {briefQuote.source}</span>}
+                  {briefQuote.url && (
+                    <a href={briefQuote.url} target="_blank" rel="noopener noreferrer" style={{
+                      color: C.amber, textDecoration: "none", marginLeft: "6px",
+                      fontFamily: F.mono, fontSize: "9px", opacity: 0.7,
+                      transition: "opacity 0.2s ease",
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.opacity = "1"}
+                      onMouseLeave={e => e.currentTarget.style.opacity = "0.7"}
+                    >source</a>
+                  )}
+                </span>
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -1568,7 +1565,7 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ fontFamily: F.mono, fontSize: "8px", color: C.slate, letterSpacing: "0.08em" }}>
-            {brief?.brief_date || ""}
+            {brief?.created_at ? `Generated ${new Date(brief.created_at).toLocaleString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })} CST` : brief?.brief_date || ""}
           </span>
         </div>
         <button onClick={() => fetchBrief(true)} disabled={briefLoading} style={{
@@ -1615,20 +1612,29 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
                   onMouseEnter={e => e.currentTarget.style.background = "rgba(123,143,163,0.06)"}
                   onMouseLeave={e => e.currentTarget.style.background = bgDefault}
                 >
-                {/* Complete button (if task_id exists) */}
+                {/* Icon with optional complete action */}
                 {item.task_id ? (
-                  <button onClick={() => completeBriefTask(item.task_id)} disabled={completingId === item.task_id} style={{
-                    width: isMobile ? "28px" : "24px", height: isMobile ? "28px" : "24px", flexShrink: 0,
-                    borderRadius: "5px", cursor: "pointer", marginTop: "1px",
-                    background: completingId === item.task_id ? C.success : "rgba(90,138,106,0.08)",
-                    border: `1.5px solid ${completingId === item.task_id ? C.success : "rgba(90,138,106,0.25)"}`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    transition: "all 0.25s ease", padding: 0,
-                  }}>
-                    <svg style={{ width: isMobile ? "14px" : "12px", height: isMobile ? "14px" : "12px", color: completingId === item.task_id ? C.obsidian : C.success }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
-                  </button>
+                  <div style={{ position: "relative", marginTop: "1px", cursor: "pointer" }}
+                    onClick={() => completeBriefTask(item.task_id)}
+                  >
+                    {iconFor(item.icon_hint, item.mood)}
+                    {/* Small complete circle overlay */}
+                    <div style={{
+                      position: "absolute", bottom: "-2px", right: "-4px",
+                      width: isMobile ? "14px" : "12px", height: isMobile ? "14px" : "12px",
+                      borderRadius: "50%",
+                      background: completingId === item.task_id ? C.success : C.cavern,
+                      border: `1.5px solid ${completingId === item.task_id ? C.success : "rgba(90,138,106,0.4)"}`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      transition: "all 0.25s ease",
+                    }}>
+                      {completingId === item.task_id && (
+                        <svg style={{ width: "8px", height: "8px", color: C.obsidian }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
+                      )}
+                    </div>
+                  </div>
                 ) : (
-                  /* Icon */
+                  /* Icon only — no task */
                   <div style={{ marginTop: "1px" }}>
                     {iconFor(item.icon_hint, item.mood)}
                   </div>
@@ -3539,7 +3545,7 @@ function FitnessModule({ isMobile, session }) {
     <div style={{ animation: "fadeUp 0.4s ease both" }}>
       {/* Status strip */}
       <div style={{
-        display: "grid", gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(5, 1fr)",
+        display: "grid", gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(6, 1fr)",
         gap: "8px", marginBottom: "20px",
       }}>
         {[
@@ -3548,6 +3554,7 @@ function FitnessModule({ isMobile, session }) {
           { label: "This Month", value: stats.thisMonth || 0, color: C.fog },
           { label: "Minutes", value: stats.totalMinutes || 0, color: C.fog },
           { label: "Miles", value: stats.totalMiles || "0", color: C.fog },
+          { label: "Weight", value: stats.currentWeight ? `${stats.currentWeight} lbs` : "--", color: stats.currentWeight ? C.cream : C.slate },
         ].map(s => (
           <div key={s.label} style={{
             background: C.cavern, border: `1px solid ${C.stone}`, borderRadius: "6px",
@@ -4158,7 +4165,7 @@ export default function BatcaveConsole() {
   ];
 
   const moduleMeta = {
-    home: { title: (() => { const h = new Date().getHours(); return h < 12 ? "Good Morning" : h < 17 ? "Good Afternoon" : "Good Evening"; })(), mono: "Alfred", subtitle: new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) },
+    home: { title: (() => { try { const h = parseInt(new Date().toLocaleString("en-US", { timeZone: "America/Chicago", hour: "numeric", hour12: false })); return h < 12 ? "Good Morning" : h < 17 ? "Good Afternoon" : "Good Evening"; } catch { const h = new Date().getHours(); return h < 12 ? "Good Morning" : h < 17 ? "Good Afternoon" : "Good Evening"; } })(), mono: "Alfred", subtitle: new Date().toLocaleDateString("en-US", { timeZone: "America/Chicago", weekday: "long", month: "long", day: "numeric", year: "numeric" }) },
     command: { title: "Alfred", mono: "AI Assistant", subtitle: "Natural language control" },
     tasks: { title: "Tasks", mono: "Personal Ops", subtitle: "Priority-driven task management" },
     calendar: { title: "Calendar", mono: "Schedule", subtitle: "Personal, professional, and travel — one view" },
@@ -4218,7 +4225,7 @@ export default function BatcaveConsole() {
           padding: isMobile ? "14px 20px" : "12px 16px", borderTop: `1px solid ${C.stone}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v5.4 // batcave</span>
+          <span style={{ fontFamily: F.mono, fontSize: "9px", color: C.slate, letterSpacing: "0.04em" }}>v5.5 // batcave</span>
           {auth.session && (
             <button onClick={auth.signOut} style={{
               background: "none", border: "none", cursor: "pointer",

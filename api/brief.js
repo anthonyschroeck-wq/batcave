@@ -63,7 +63,11 @@ export default async function handler(req, res) {
 
   const overdue = tasks.filter(t => t.due_date && t.due_date < today);
 
-  const context = `Date: ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+  const cstTime = new Date().toLocaleString("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit", hour12: true });
+  const cstHour = parseInt(new Date().toLocaleString("en-US", { timeZone: "America/Chicago", hour: "numeric", hour12: false }));
+
+  const context = `Date: ${new Date().toLocaleDateString("en-US", { timeZone: "America/Chicago", weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+Current time (CST): ${cstTime} (hour: ${cstHour})
 TASKS (${tasks.length} open):
 ${tasks.map(t => `- [${t.priority?.toUpperCase() || "MED"}]${t.recurrence ? ` [${t.recurrence.toUpperCase()}]` : ""} ${t.title} (id:${t.id}, due:${t.due_date || "none"})`).join("\n") || "None"}
 ${overdue.length > 0 ? `OVERDUE: ${overdue.map(t => `${t.title} (id:${t.id})`).join(", ")}` : ""}
@@ -86,9 +90,9 @@ COST: $${(monthCost / 100).toFixed(2)} this month`;
         temperature: 0,
         system: `You are Alfred, Tony's AI butler. Generate a daily briefing as a JSON object. Your ENTIRE response must be ONLY valid JSON. No text before or after. Start with { end with }.
 
-Format: {"greeting":"...","quote_text":"...","quote_author":"...","quote_source":null,"items":[{"text":"...","horizon":"now|today|tomorrow|week|fyi","mood":"urgent|warm|neutral|positive|alert|overdue","category":"task|event|health|news|personal","icon_hint":"...","task_id":"uuid or null"}]}
+Format: {"greeting":"Good [Morning/Afternoon/Evening], Master Tony.","quote_text":"...","quote_author":"...","quote_source":"title of work or speech","quote_url":"https://public-link-about-the-quote-or-author","items":[{"text":"...","horizon":"now|today|tomorrow|week|fyi","mood":"urgent|warm|neutral|positive|alert|overdue","category":"task|event|health|news|personal","icon_hint":"...","task_id":"uuid or null"}]}
 
-Rules: Address as "Master Tony". 6-8 items max. Overdue tasks use mood "overdue". Include task UUIDs as task_id. End with 2 news items (category "news"). Today: ${today}`,
+Rules: Address as "Master Tony". The greeting MUST match CST (Central Standard Time / America/Chicago): before noon = "Good Morning", noon-5pm = "Good Afternoon", after 5pm = "Good Evening". 6-8 items max. Overdue tasks use mood "overdue". Include task UUIDs as task_id. End with 2 news items (category "news"). quote_url should link to a public page about the quote (Goodreads, Wikipedia, BrainyQuote, etc). Today: ${today}`,
         messages: [{ role: "user", content: context }],
       }),
     });
