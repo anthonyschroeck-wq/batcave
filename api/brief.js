@@ -40,26 +40,36 @@ export default async function handler(req, res) {
   try { apiKey = await getSecret("anthropic"); } catch {}
   if (!apiKey) return res.status(503).json({ error: "Anthropic key not found in batcave_secrets" });
 
-  // Gather context — each query wrapped individually so one failure doesn't kill all
+  // Gather context — all queries in parallel with individual error handling
   let tasks = [], events = [], fitnessGoals = [], fitnessToday = [], monthCost = 0, headlines = [];
 
-  try { const r = await supabase.from("batcave_tasks").select("*").eq("completed", false).order("due_date").limit(10); tasks = r.data || []; } catch {}
-  try { const r = await supabase.from("batcave_events").select("*").gte("end_date", today).order("start_date").limit(7); events = r.data || []; } catch {}
-  try { const r = await supabase.from("batcave_fitness_goals").select("*").eq("status", "active"); fitnessGoals = r.data || []; } catch {}
-  try { const r = await supabase.from("batcave_fitness_log").select("*").eq("activity_date", today); fitnessToday = r.data || []; } catch {}
-  try {
-    const r = await supabase.from("batcave_usage").select("cost_cents").gte("created_at", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
-    monthCost = (r.data || []).reduce((s, u) => s + parseFloat(u.cost_cents || 0), 0);
-  } catch {}
+  const queries = await Promise.allSettled([
+    supabase.from("batcave_tasks").select("*").eq("completed", false).order("due_date").limit(10),
+    supabase.from("batcave_events").select("*").gte("end_date", today).order("start_date").limit(7),
+    supabase.from("batcave_fitness_goals").select("*").eq("status", "active"),
+    supabase.from("batcave_fitness_log").select("*").eq("activity_date", today),
+    supabase.from("batcave_usage").select("cost_cents").gte("created_at", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
+    // Finnhub with 3s timeout
+    (async () => {
+      const fk = await getSecret("finnhub");
+      if (!fk) return { data: [] };
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 3000);
+      try {
+        const nr = await fetch(`https://finnhub.io/api/v1/news?category=general&token=${fk}`, { signal: ctrl.signal });
+        clearTimeout(timer);
+        if (nr.ok) return { data: await nr.json() };
+      } catch { clearTimeout(timer); }
+      return { data: [] };
+    })(),
+  ]);
 
-  // Finnhub news — optional
-  try {
-    const fk = await getSecret("finnhub");
-    if (fk) {
-      const nr = await fetch(`https://finnhub.io/api/v1/news?category=general&token=${fk}`);
-      if (nr.ok) { const a = await nr.json(); headlines = (a || []).slice(0, 6).map(x => `${x.headline} (${x.source})`); }
-    }
-  } catch {}
+  if (queries[0].status === "fulfilled") tasks = queries[0].value.data || [];
+  if (queries[1].status === "fulfilled") events = queries[1].value.data || [];
+  if (queries[2].status === "fulfilled") fitnessGoals = queries[2].value.data || [];
+  if (queries[3].status === "fulfilled") fitnessToday = queries[3].value.data || [];
+  if (queries[4].status === "fulfilled") monthCost = (queries[4].value.data || []).reduce((s, u) => s + parseFloat(u.cost_cents || 0), 0);
+  if (queries[5].status === "fulfilled") headlines = (queries[5].value.data || []).slice(0, 6).map(x => typeof x === "string" ? x : `${x.headline} (${x.source})`);
 
   const overdue = tasks.filter(t => t.due_date && t.due_date < today);
 
@@ -81,9 +91,12 @@ ${headlines.length > 0 ? headlines.map(h => `- ${h}`).join("\n") : "No news feed
 COST: $${(monthCost / 100).toFixed(2)} this month`;
 
   try {
+    const anthropicCtrl = new AbortController();
+    const anthropicTimer = setTimeout(() => anthropicCtrl.abort(), 8000);
     const resp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+      signal: anthropicCtrl.signal,
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 700,
@@ -98,9 +111,11 @@ Rules: Address as "Master Tony". The greeting MUST match CST (Central Standard T
     });
 
     if (!resp.ok) {
+      clearTimeout(anthropicTimer);
       const errBody = await resp.text().catch(() => "");
       return res.status(502).json({ error: `Anthropic API ${resp.status}`, detail: errBody.slice(0, 200) });
     }
+    clearTimeout(anthropicTimer);
 
     const data = await resp.json();
     let content = (data.content || []).map(c => c.text || "").join("");
