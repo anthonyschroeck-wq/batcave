@@ -10,25 +10,29 @@ async function getContext() {
   const today = new Date().toISOString().slice(0, 10);
   const weekOut = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
 
-  const [tasksRes, eventsRes] = await Promise.all([
-    supabase.from("batcave_tasks").select("*").eq("completed", false).order("due_date"),
-    supabase.from("batcave_events").select("*").gte("end_date", today).lte("start_date", weekOut).order("start_date"),
-  ]);
+  // Defensive — each query isolated
+  let tasks = [], events = [], fitnessGoals = [], fitnessToday = [];
+  try { const r = await supabase.from("batcave_tasks").select("*").eq("completed", false).order("due_date").limit(15); tasks = r.data || []; } catch {}
+  try { const r = await supabase.from("batcave_events").select("*").gte("end_date", today).lte("start_date", weekOut).order("start_date").limit(10); events = r.data || []; } catch {}
+  try { const r = await supabase.from("batcave_fitness_goals").select("*").eq("status", "active"); fitnessGoals = r.data || []; } catch {}
+  try { const r = await supabase.from("batcave_fitness_log").select("*").eq("activity_date", today); fitnessToday = r.data || []; } catch {}
 
-  const tasks = tasksRes.data || [];
-  const events = eventsRes.data || [];
   const overdue = tasks.filter(t => t.due_date && t.due_date < today);
 
   return `Current date: ${today}
   
 OPEN TASKS (${tasks.length}):
-${tasks.map(t => `- [${t.priority.toUpperCase()}] ${t.title} (due: ${t.due_date || "no date"}) id:${t.id}`).join("\n")}
-${overdue.length > 0 ? `\nOVERDUE: ${overdue.map(t => t.title).join(", ")}` : ""}
+${tasks.map(t => `- [${t.priority?.toUpperCase() || "MED"}]${t.recurrence ? ` [${t.recurrence.toUpperCase()}]` : ""} ${t.title} (due: ${t.due_date || "none"}) id:${t.id}`).join("\n") || "None"}
+${overdue.length > 0 ? `\nOVERDUE: ${overdue.map(t => `${t.title} (id:${t.id})`).join(", ")}` : ""}
 
 UPCOMING EVENTS (next 7 days):
 ${events.map(e => `- ${e.title}: ${e.start_date} to ${e.end_date || e.start_date} [${e.category}]${e.location ? " @ " + e.location : ""} id:${e.id}`).join("\n") || "None"}
 
-PROJECTS: Batcave Console (v3.1, active), Omote (mk8.4, active), Cerebro (mk1.1, active), Run Recipes (active), Veritas (incubating)`;
+FITNESS:
+${fitnessGoals.map(g => `- GOAL: ${g.title} (${g.target_value} ${g.target_unit}/${g.target_period})`).join("\n") || "No goals"}
+${fitnessToday.length > 0 ? `Logged today: ${fitnessToday.map(l => l.activity_type).join(", ")}` : "No activity today"}
+
+PROJECTS: Batcave Console (v5.5, active), Omote (mk8.5, active), Cerebro (mk1.1, active), Run Recipes (active), Veritas (incubating)`;
 }
 
 async function logUsage(supabase, inputTokens, outputTokens, model, endpoint) {

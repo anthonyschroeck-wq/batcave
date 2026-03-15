@@ -1385,7 +1385,7 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
 
   useEffect(() => { fetchBrief(false); }, [fetchBrief]);
 
-  // Auto-refresh briefing at 5am, noon, 7pm CST
+  // Auto-refresh briefing every 6 hours from midnight CST
   useEffect(() => {
     const checkRefresh = () => {
       if (!brief?.created_at) return;
@@ -1393,7 +1393,7 @@ function HomepageModule({ isMobile, session, refreshKey, triggerRefresh }) {
       const cst = new Date(now.toLocaleString("en-US", { timeZone: "America/Chicago" }));
       const h = cst.getHours();
       const m = cst.getMinutes();
-      const windows = [5, 12, 19]; // 5am, noon, 7pm CST
+      const windows = [0, 6, 12, 18]; // midnight, 6am, noon, 6pm CST
       const createdAt = new Date(brief.created_at);
       for (const w of windows) {
         const windowTime = new Date(cst);
