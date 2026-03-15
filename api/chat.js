@@ -8,16 +8,44 @@ async function getContext() {
   if (!supabase) return null;
 
   const today = new Date().toISOString().slice(0, 10);
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+  const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
   const weekOut = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
 
   // Defensive — each query isolated
-  let tasks = [], events = [], fitnessGoals = [], fitnessToday = [];
+  let tasks = [], events = [], fitnessGoals = [], fitnessToday = [], fitnessWeek = [], fitnessMonth = [], latestWeight = null;
   try { const r = await supabase.from("batcave_tasks").select("*").eq("completed", false).order("due_date").limit(15); tasks = r.data || []; } catch {}
   try { const r = await supabase.from("batcave_events").select("*").gte("end_date", today).lte("start_date", weekOut).order("start_date").limit(10); events = r.data || []; } catch {}
   try { const r = await supabase.from("batcave_fitness_goals").select("*").eq("status", "active"); fitnessGoals = r.data || []; } catch {}
   try { const r = await supabase.from("batcave_fitness_log").select("*").eq("activity_date", today); fitnessToday = r.data || []; } catch {}
+  try { const r = await supabase.from("batcave_fitness_log").select("*").gte("activity_date", weekAgo).order("activity_date", { ascending: false }); fitnessWeek = r.data || []; } catch {}
+  try { const r = await supabase.from("batcave_fitness_log").select("*").gte("activity_date", monthAgo); fitnessMonth = r.data || []; } catch {}
+  try { const r = await supabase.from("batcave_weight_log").select("*").order("logged_date", { ascending: false }).limit(1); latestWeight = r.data?.[0] || null; } catch {}
 
   const overdue = tasks.filter(t => t.due_date && t.due_date < today);
+
+  // Fitness stats
+  const monthMiles = fitnessMonth.reduce((s, l) => s + parseFloat(l.distance_miles || 0), 0).toFixed(1);
+  const monthMinutes = fitnessMonth.reduce((s, l) => s + (l.duration_minutes || 0), 0);
+  const weekMiles = fitnessWeek.reduce((s, l) => s + parseFloat(l.distance_miles || 0), 0).toFixed(1);
+  const weekSessions = fitnessWeek.length;
+
+  // Calculate streak for daily goals
+  let streakInfo = "";
+  for (const g of fitnessGoals) {
+    if (g.target_period === "day") {
+      let streak = 0;
+      const d = new Date();
+      for (let i = 0; i < 30; i++) {
+        const dateStr = d.toISOString().slice(0, 10);
+        const dayHit = fitnessMonth.some(l => l.activity_date === dateStr && (l.goal_id === g.id || g.category === l.activity_type));
+        if (dayHit) { streak++; d.setDate(d.getDate() - 1); }
+        else if (i === 0) { d.setDate(d.getDate() - 1); continue; }
+        else break;
+      }
+      if (streak > 0) streakInfo += `${g.title}: ${streak}-day streak. `;
+    }
+  }
 
   return `Current date: ${today}
   
@@ -29,8 +57,13 @@ UPCOMING EVENTS (next 7 days):
 ${events.map(e => `- ${e.title}: ${e.start_date} to ${e.end_date || e.start_date} [${e.category}]${e.location ? " @ " + e.location : ""} id:${e.id}`).join("\n") || "None"}
 
 FITNESS:
-${fitnessGoals.map(g => `- GOAL: ${g.title} (${g.target_value} ${g.target_unit}/${g.target_period})`).join("\n") || "No goals"}
-${fitnessToday.length > 0 ? `Logged today: ${fitnessToday.map(l => l.activity_type).join(", ")}` : "No activity today"}
+Goals: ${fitnessGoals.map(g => `${g.title} (${g.target_value} ${g.target_unit}/${g.target_period})`).join("; ") || "None set"}
+Today: ${fitnessToday.length > 0 ? fitnessToday.map(l => `${l.activity_type}${l.duration_minutes ? ` ${l.duration_minutes}min` : ""}${l.distance_miles ? ` ${l.distance_miles}mi` : ""}`).join(", ") : "No activity logged"}
+This week: ${weekSessions} sessions, ${weekMiles} miles
+This month: ${fitnessMonth.length} sessions, ${monthMiles} miles, ${monthMinutes} minutes
+${streakInfo ? `Streaks: ${streakInfo}` : ""}
+Recent log: ${fitnessWeek.slice(0, 5).map(l => `${l.activity_date}: ${l.activity_type}${l.distance_miles ? ` ${l.distance_miles}mi` : ""}${l.duration_minutes ? ` ${l.duration_minutes}min` : ""}${l.source !== "manual" ? ` (${l.source})` : ""}`).join("; ") || "None"}
+Weight: ${latestWeight ? `${latestWeight.weight_lbs} lbs (${latestWeight.logged_date})` : "Not tracked"}
 
 PROJECTS: Batcave Console (v5.5, active), Omote (mk8.5, active), Cerebro (mk1.1, active), Run Recipes (active), Veritas (incubating)`;
 }
@@ -195,6 +228,8 @@ RULES:
   - "log my cardio" (no details) → log_activity with activity_type:"run", title:"Cardio session"
 - Always calculate duration from pace+distance if given (e.g. 3 miles at 10min/mile = 30 minutes).
 - "I weigh 185" or "weight 185.5" or "log weight 190" → log_weight with weight_lbs. Parse the number from natural language.
+- FITNESS READ-BACK: You have full fitness context. When asked questions like "how many miles this month", "what's my streak", "how's my training going", "summarize my week", "what's my weight" — answer directly from the FITNESS section in context. Be specific with numbers.
+- WEEKLY SUMMARY: When asked for a weekly summary or "how was my week", synthesize tasks completed, events attended, fitness activity, and any notable patterns. Be direct and data-driven. Include miles, sessions, streaks, and call out wins or gaps.
 - Today's date is ${new Date().toISOString().slice(0, 10)}.
 - Dates like "friday", "next tuesday" should resolve to actual YYYY-MM-DD dates.`;
 

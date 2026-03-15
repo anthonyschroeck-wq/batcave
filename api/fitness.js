@@ -1,9 +1,130 @@
-import { getServiceClient, getUserClient } from "./_supabase.js";
+import { getServiceClient, getUserClient, getSecret } from "./_supabase.js";
+
+// ─── Strava token refresh ─────────────────────────────────────
+async function getStravaToken(supabase) {
+  const accessToken = await getSecret("strava_access_token");
+  const refreshToken = await getSecret("strava_refresh_token");
+  const clientId = await getSecret("strava_client_id");
+  const clientSecret = await getSecret("strava_client_secret");
+
+  if (!refreshToken || !clientId || !clientSecret) return null;
+
+  // Try existing token first — refresh if expired
+  if (accessToken) {
+    // Test it
+    const test = await fetch("https://www.strava.com/api/v3/athlete", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (test.ok) return accessToken;
+  }
+
+  // Refresh the token
+  try {
+    const resp = await fetch("https://www.strava.com/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_id: clientId, client_secret: clientSecret,
+        refresh_token: refreshToken, grant_type: "refresh_token",
+      }),
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+
+    // Save new tokens
+    await supabase.from("batcave_secrets").upsert(
+      { service_id: "strava_access_token", api_key: data.access_token, label: "Strava Access Token" },
+      { onConflict: "service_id" }
+    );
+    if (data.refresh_token) {
+      await supabase.from("batcave_secrets").upsert(
+        { service_id: "strava_refresh_token", api_key: data.refresh_token, label: "Strava Refresh Token" },
+        { onConflict: "service_id" }
+      );
+    }
+    return data.access_token;
+  } catch { return null; }
+}
 
 export default async function handler(req, res) {
   const supabase = getServiceClient();
   if (!supabase) return res.status(503).json({ error: "Supabase not configured" });
 
+  const action = req.query.action;
+
+  // ─── Strava Webhook (no auth — Strava calls this directly) ──
+  if (action === "strava_webhook") {
+    // GET = subscription verification
+    if (req.method === "GET") {
+      const VERIFY_TOKEN = "batcave_strava_verify";
+      if (req.query["hub.mode"] === "subscribe" && req.query["hub.verify_token"] === VERIFY_TOKEN) {
+        return res.json({ "hub.challenge": req.query["hub.challenge"] });
+      }
+      return res.status(403).json({ error: "Verification failed" });
+    }
+
+    // POST = activity event
+    if (req.method === "POST") {
+      const { object_type, aspect_type, object_id } = req.body || {};
+      if (object_type !== "activity" || aspect_type !== "create") {
+        return res.json({ ok: true, skipped: true });
+      }
+
+      // Fetch activity details from Strava
+      const token = await getStravaToken(supabase);
+      if (!token) return res.json({ ok: false, error: "No Strava token" });
+
+      try {
+        const actResp = await fetch(`https://www.strava.com/api/v3/activities/${object_id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!actResp.ok) return res.json({ ok: false, error: `Strava API ${actResp.status}` });
+        const act = await actResp.json();
+
+        // Map Strava activity to our schema
+        const typeMap = { Run: "run", Ride: "cycle", Walk: "walk", Swim: "swim", WeightTraining: "strength", Yoga: "yoga" };
+        const actType = typeMap[act.type] || "other";
+        const durationMin = Math.round((act.moving_time || 0) / 60);
+        const distanceMi = act.distance ? parseFloat((act.distance / 1609.34).toFixed(2)) : null;
+        const calories = act.calories || null;
+        const actDate = act.start_date_local ? act.start_date_local.slice(0, 10) : new Date().toISOString().slice(0, 10);
+
+        // Find the user (single-user app — get the first user with fitness data or first user)
+        let userId = null;
+        try {
+          const { data: users } = await supabase.from("batcave_fitness_goals").select("user_id").limit(1);
+          userId = users?.[0]?.user_id;
+        } catch {}
+        if (!userId) {
+          try {
+            const { data: users } = await supabase.from("batcave_tasks").select("user_id").limit(1);
+            userId = users?.[0]?.user_id;
+          } catch {}
+        }
+
+        if (userId) {
+          await supabase.from("batcave_fitness_log").insert({
+            user_id: userId,
+            activity_type: actType,
+            title: act.name || `${act.type} via Strava`,
+            duration_minutes: durationMin,
+            distance_miles: distanceMi,
+            calories,
+            source: "strava",
+            activity_date: actDate,
+            notes: `strava:${object_id}`,
+          });
+        }
+
+        return res.json({ ok: true, logged: act.name });
+      } catch (err) {
+        return res.json({ ok: false, error: err.message });
+      }
+    }
+    return res.status(405).json({ error: "GET or POST" });
+  }
+
+  // ─── Authenticated endpoints below ─────────────────────────
   const jwt = req.headers.authorization?.replace("Bearer ", "");
   const userClient = jwt ? getUserClient(jwt) : null;
   if (!userClient) return res.status(401).json({ error: "Auth required" });
@@ -11,16 +132,16 @@ export default async function handler(req, res) {
   const { data: { user } } = await userClient.auth.getUser();
   if (!user) return res.status(401).json({ error: "Invalid session" });
 
-  const action = req.query.action || (req.method === "GET" ? "summary" : null);
+  const authAction = action || (req.method === "GET" ? "summary" : null);
 
   // ─── GET ──────────────────────────────────────────────────
   if (req.method === "GET") {
-    if (action === "goals") {
+    if (authAction === "goals") {
       const { data } = await userClient.from("batcave_fitness_goals").select("*").order("created_at");
       return res.json({ goals: data || [] });
     }
 
-    if (action === "log") {
+    if (authAction === "log") {
       const days = parseInt(req.query.days) || 30;
       const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
       const { data } = await userClient.from("batcave_fitness_log")
@@ -28,7 +149,7 @@ export default async function handler(req, res) {
       return res.json({ log: data || [], days });
     }
 
-    if (action === "weight") {
+    if (authAction === "weight") {
       const days = parseInt(req.query.days) || 90;
       const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
       const { data } = await userClient.from("batcave_weight_log")
